@@ -34,6 +34,7 @@ echo.
 echo  Instalando dependencias...
 echo.
 
+%PYTHON% -m pip install --upgrade pip
 %PYTHON% -m pip install mss Pillow numpy openai anthropic keyboard
 
 echo.

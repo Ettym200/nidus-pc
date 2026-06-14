@@ -3,6 +3,9 @@ chcp 65001 >nul
 title Game Translator
 cd /d "%~dp0"
 
+:: Garante dependencias instaladas
+python -m pip install mss Pillow numpy openai anthropic keyboard >nul 2>&1
+
 :: Tenta python, depois python3
 python --version >nul 2>&1
 if %errorlevel% == 0 (
