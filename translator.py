@@ -79,7 +79,8 @@ class Translator:
         return self._clean(result)
 
     def _clean(self, text: str) -> str:
-        # Remove blocos markdown ```...``` que algumas IAs retornam
+        if not text:
+            return ""
         import re
         text = re.sub(r"```[a-z]*\n?", "", text).strip("`").strip()
         return text
@@ -96,7 +97,8 @@ class Translator:
             }],
             max_tokens=300,
         )
-        return response.choices[0].message.content.strip()
+        content = response.choices[0].message.content
+        return content.strip() if content else ""
 
     def _translate_anthropic(self, b64: str, prompt: str) -> str:
         response = self._client.messages.create(
@@ -110,4 +112,5 @@ class Translator:
                 ],
             }],
         )
-        return response.content[0].text.strip()
+        content = response.content[0].text if response.content else ""
+        return content.strip() if content else ""
