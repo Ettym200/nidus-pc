@@ -591,7 +591,7 @@ class App(tk.Tk):
 
     def _translate_once(self):
         try:
-            frame, _ = next(self.capture.stream())
+            frame = self.capture.capture_now()
             translation = self.translator.translate(frame)
             if translation:
                 self.overlay.show(translation)

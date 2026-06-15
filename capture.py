@@ -23,13 +23,11 @@ class ScreenCapture:
             return Image.frombytes("RGB", raw.size, raw.bgra, "raw", "BGRX")
 
     def _hash(self, img: Image.Image) -> str:
-        # Converte pra escala de cinza e binariza (só texto de alto contraste fica)
-        gray = np.array(img.convert("L"))
-        # Threshold: pixels muito claros (texto branco) ou muito escuros (texto preto)
-        binary = ((gray > 200) | (gray < 50)).astype(np.uint8) * 255
-        # Reduz tamanho antes de hashear para ser rápido
-        small = Image.fromarray(binary).resize((128, 32))
+        small = img.resize((128, 32)).convert("L")
         return hashlib.md5(np.array(small).tobytes()).hexdigest()
+
+    def capture_now(self) -> Image.Image:
+        return self._capture_frame()
 
     def stream(self):
         """Gera (frame, changed) continuamente."""
