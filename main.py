@@ -161,6 +161,10 @@ class App(tk.Tk):
         tk.Label(frame_api, text="(deixe vazio para usar o padrão do provedor)",
                  bg="#1a1a2e", fg="#555577", font=("Segoe UI", 8)).grid(row=5, column=1, sticky="w", padx=8)
 
+        tk.Button(frame_api, text="🔑 Gerenciar Keys", command=self._open_keys,
+                  bg="#e94560", fg="white", relief="flat", cursor="hand2",
+                  font=("Segoe UI", 9, "bold")).grid(row=6, column=0, columnspan=2, pady=8, padx=8, sticky="ew")
+
         self._update_url_state()
 
         # Tradução
@@ -242,10 +246,6 @@ class App(tk.Tk):
                   bg="#0f3460", fg="#eaeaea", relief="flat", cursor="hand2").pack(pady=4)
 
         tk.Button(f, text="?  Como usar", command=self._open_help,
-                  bg="#0f3460", fg="#eaeaea", font=("Segoe UI", 9),
-                  relief="flat", cursor="hand2").pack(pady=(0, 4))
-
-        tk.Button(f, text="🔑  Gerenciar API Keys", command=self._open_keys,
                   bg="#0f3460", fg="#eaeaea", font=("Segoe UI", 9),
                   relief="flat", cursor="hand2").pack(pady=(0, 4))
 
