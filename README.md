@@ -28,6 +28,16 @@ Se quiser, você pode apoiar o projeto voluntariamente (via Pix, dentro do app),
 
 ---
 
+## Download (Android / APK)
+
+Quer usar o Nidus no celular? A versão para Android (Flutter) está em outro repositório:
+
+**[Repositório do Nidus para Android](https://github.com/Ettym200/Nidus)**
+
+**[Baixar APK (última versão)](https://github.com/Ettym200/Nidus/releases/latest)**
+
+---
+
 ## Como usar
 
 ### 1. Instale
