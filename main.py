@@ -1,24 +1,45 @@
 import sys
 import ctypes
 import subprocess
+import os
 
 # Re-lança como admin se necessário (para hotkeys funcionarem em jogos)
 def _is_admin():
     try:
         return ctypes.windll.shell32.IsUserAnAdmin()
-    except:
+    except Exception:
         return False
 
+
+def _app_dir():
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(os.path.abspath(sys.executable))
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+def _setup_runtime():
+    app_dir = _app_dir()
+    os.chdir(app_dir)
+    return app_dir
+
+
+def _relaunch_as_admin():
+    exe = sys.executable
+    params = subprocess.list2cmdline(sys.argv[1:])
+    cwd = os.path.dirname(os.path.abspath(exe))
+    ret = ctypes.windll.shell32.ShellExecuteW(None, "runas", exe, params, cwd, 1)
+    if ret > 32:
+        sys.exit(0)
+
+
+APP_DIR = _setup_runtime()
+
 if not _is_admin():
-    ctypes.windll.shell32.ShellExecuteW(
-        None, "runas", sys.executable, " ".join(f'"{a}"' for a in sys.argv), None, 1
-    )
-    sys.exit(0)
+    _relaunch_as_admin()
 
 import tkinter as tk
 import threading
 import json
-import os
 import keyboard
 import mouse
 import customtkinter as ctk
@@ -27,8 +48,11 @@ from capture import ScreenCapture
 from translator import Translator, KNOWN_PROVIDERS
 from overlay import Overlay
 import ui_theme as theme
+from updater import check_update
 
-CONFIG_FILE = "config.json"
+CONFIG_FILE = os.path.join(APP_DIR, "config.json")
+APP_VERSION = "1.0.2"
+RELEASES_URL = "https://github.com/Ettym200/nidus-pc/releases/latest"
 
 DEFAULT_CONFIG = {
     "api_key": "",
@@ -41,6 +65,7 @@ DEFAULT_CONFIG = {
     "capture_interval": 1.5,
     "hotkey_region": "f9",
     "hotkey_translate": "f10",
+    "skipped_update_version": "",
 }
 
 
@@ -86,8 +111,15 @@ PROVIDER_HINTS = {
 
 
 def _resource_path(name: str) -> str:
-    base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(base, name)
+    if os.path.isabs(name) and os.path.exists(name):
+        return name
+    bundled = os.path.join(getattr(sys, "_MEIPASS", APP_DIR), name)
+    if os.path.exists(bundled):
+        return bundled
+    local = os.path.join(APP_DIR, name)
+    if os.path.exists(local):
+        return local
+    return bundled
 
 
 def _set_window_icon(window):
@@ -140,6 +172,63 @@ class App(ctk.CTk):
         self._build_ui()
         self._register_hotkeys()
         self._on_mode_change()
+        self.after(1500, self._check_updates_async)
+
+    def _check_updates_async(self):
+        def _run():
+            skipped = self.config.get("skipped_update_version", "")
+            info = check_update(APP_VERSION, skipped)
+            if info:
+                self.after(0, lambda: self._show_update_dialog(info))
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _show_update_dialog(self, info):
+        win = ctk.CTkToplevel(self)
+        win.title("Atualização disponível")
+        win.geometry("420x280")
+        win.resizable(False, False)
+        win.attributes("-topmost", True)
+        win.configure(fg_color=theme.BG)
+        win.transient(self)
+        win.grab_set()
+
+        ctk.CTkLabel(
+            win, text="Nova versão disponível!",
+            font=(theme.FONT, 16, "bold"), text_color=theme.ACCENT,
+        ).pack(pady=(20, 6))
+
+        ctk.CTkLabel(
+            win,
+            text=f"Você está na v{APP_VERSION}  →  v{info['version']} já está no ar.",
+            font=(theme.FONT, 11), text_color=theme.TEXT,
+            wraplength=380,
+        ).pack(pady=(0, 8))
+
+        notes = info.get("notes", "")
+        if notes:
+            preview = notes if len(notes) <= 200 else notes[:200] + "..."
+            ctk.CTkLabel(
+                win, text=preview,
+                font=(theme.FONT, 10), text_color=theme.TEXT_MUTED,
+                wraplength=380, justify="left",
+            ).pack(pady=(0, 12), padx=20)
+
+        btn_row = ctk.CTkFrame(win, fg_color="transparent")
+        btn_row.pack(fill="x", padx=20, pady=(8, 20))
+
+        def download():
+            import webbrowser
+            webbrowser.open(info["url"])
+
+        def later():
+            self.config["skipped_update_version"] = info["tag"]
+            save_config(self.config)
+            win.destroy()
+
+        theme.primary_btn(btn_row, "Baixar agora", download).pack(
+            side="left", fill="x", expand=True, padx=(0, 6),
+        )
+        theme.secondary_btn(btn_row, "Depois", later).pack(side="left", fill="x", expand=True)
 
     # ── UI principal ─────────────────────────────────────────────────────
 
@@ -168,10 +257,16 @@ class App(ctk.CTk):
         f = scroll
         pad = {"padx": 4, "pady": 6}
 
+        title_row = ctk.CTkFrame(f, fg_color="transparent")
+        title_row.pack(fill="x", pady=(12, 4))
         ctk.CTkLabel(
-            f, text="Nidus",
+            title_row, text="Nidus",
             font=(theme.FONT, 18, "bold"), text_color=theme.ACCENT,
-        ).pack(pady=(12, 4))
+        ).pack(side="left")
+        ctk.CTkLabel(
+            title_row, text=f"v{APP_VERSION}",
+            font=(theme.FONT, 10), text_color=theme.TEXT_MUTED,
+        ).pack(side="left", padx=(8, 0), pady=(4, 0))
         ctk.CTkLabel(
             f, text="Tradução simultânea de legendas de jogos",
             font=(theme.FONT, 11), text_color=theme.TEXT_MUTED,
@@ -851,7 +946,7 @@ class App(ctk.CTk):
 
         try:
             from PIL import ImageTk
-            img = Image.open("code.jpeg").resize((220, 220))
+            img = Image.open(_resource_path("code.jpeg")).resize((220, 220))
             photo = ImageTk.PhotoImage(img)
             lbl_img = ctk.CTkLabel(win, image=photo, text="")
             lbl_img.image = photo
@@ -1098,5 +1193,20 @@ class RegionSelector(tk.Toplevel):
 
 
 if __name__ == "__main__":
-    app = App()
-    app.mainloop()
+    try:
+        app = App()
+        app.mainloop()
+    except Exception:
+        import traceback
+        log_path = os.path.join(APP_DIR, "nidus_error.log")
+        with open(log_path, "w", encoding="utf-8") as f:
+            traceback.print_exc(file=f)
+        if getattr(sys, "frozen", False):
+            ctypes.windll.user32.MessageBoxW(
+                0,
+                f"O Nidus encontrou um erro ao iniciar.\n\nDetalhes em:\n{log_path}",
+                "Nidus",
+                0x10,
+            )
+        else:
+            raise

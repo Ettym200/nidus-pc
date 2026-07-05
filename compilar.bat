@@ -16,12 +16,13 @@ python build_icon.py
 echo  Gerando executavel...
 echo.
 
+set "EXTRA_DATA=--add-data icon.png;. --add-data icon.ico;."
+if exist code.jpeg set "EXTRA_DATA=%EXTRA_DATA% --add-data code.jpeg;."
+
 python -m PyInstaller --noconfirm --onefile --windowed ^
   --name "Nidus" ^
   --icon "icon.ico" ^
-  --add-data "code.jpeg;." ^
-  --add-data "icon.png;." ^
-  --add-data "icon.ico;." ^
+  %EXTRA_DATA% ^
   --hidden-import PIL ^
   --hidden-import PIL.ImageTk ^
   --hidden-import mss ^
@@ -30,7 +31,9 @@ python -m PyInstaller --noconfirm --onefile --windowed ^
   --hidden-import keyboard ^
   --hidden-import mouse ^
   --hidden-import customtkinter ^
+  --hidden-import updater ^
   --collect-all customtkinter ^
+  --collect-all mss ^
   main.py
 
 echo.
