@@ -14,11 +14,29 @@ Se quiser, você pode apoiar o projeto voluntariamente (via Pix, dentro do app),
 
 ---
 
+## Download (Windows)
+
+**Forma mais fácil:** baixe o executável pronto na página de releases:
+
+**[Baixar Nidus para Windows (última versão)](https://github.com/Ettym200/nidus-pc/releases/latest)**
+
+1. Baixe o arquivo `Nidus.exe`
+2. Execute e conceda permissão de administrador quando o Windows pedir
+3. Configure sua API Key e comece a usar
+
+> Baixe sempre pelo link acima. Versão atual: [v1.0.1](https://github.com/Ettym200/nidus-pc/releases/tag/v1.0.1)
+
+---
+
 ## Como usar
 
 ### 1. Instale
 
-**Windows**
+**Windows (executável — recomendado)**
+
+Use o link de download acima. Não precisa instalar Python.
+
+**Windows (código-fonte / desenvolvedores)**
 
 1. Instale o [Python 3.8+](https://www.python.org/downloads/) — marque **"Add Python to PATH"**
 2. Clone ou baixe este repositório
@@ -95,13 +113,13 @@ Para trocar um atalho: clique no campo correspondente e pressione a tecla ou bot
 
 ## Compilar em .exe
 
-Para gerar um executável standalone:
+Para gerar um executável standalone localmente:
 
 ```
 compilar.bat
 ```
 
-O arquivo gerado fica em `dist\Nidus.exe`.
+O arquivo gerado fica em `dist\Nidus.exe`. Para distribuir, publique em [Releases](https://github.com/Ettym200/nidus-pc/releases).
 
 ---
 
