@@ -6,6 +6,18 @@ Nidus é um aplicativo de tradução para **PC (Windows)** que exibe um overlay 
 
 ---
 
+## Capturas de tela
+
+Configuração da API, idioma e modo de tradução:
+
+![Configuração do Nidus](docs/screenshot-config.png)
+
+Região monitorada, atalhos e controles principais:
+
+![Controles do Nidus](docs/screenshot-controles.png)
+
+---
+
 ## ⚠️ Este aplicativo é 100% gratuito
 
 Este aplicativo é totalmente gratuito. Nada aqui é pago e nunca será. Se alguém te vendeu o Nidus, você está sendo enganado — baixe sempre a partir do [repositório oficial](https://github.com/Ettym200/nidus-pc).
