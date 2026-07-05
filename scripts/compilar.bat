@@ -1,6 +1,7 @@
 @echo off
 chcp 65001 >nul
 title Nidus - Compilando...
+cd /d "%~dp0\.."
 
 echo.
 echo  ================================
@@ -11,17 +12,17 @@ echo.
 pip install pyinstaller >nul 2>&1
 
 echo  Convertendo icone...
-python build_icon.py
+python scripts\build_icon.py
 
 echo  Gerando executavel...
 echo.
 
-set "EXTRA_DATA=--add-data icon.png;. --add-data icon.ico;."
-if exist code.jpeg set "EXTRA_DATA=%EXTRA_DATA% --add-data code.jpeg;."
+set "EXTRA_DATA=--add-data assets\icon.png;assets --add-data assets\icon.ico;assets"
+if exist assets\code.jpeg set "EXTRA_DATA=%EXTRA_DATA% --add-data assets\code.jpeg;assets"
 
 python -m PyInstaller --noconfirm --onefile --windowed ^
   --name "Nidus" ^
-  --icon "icon.ico" ^
+  --icon "assets\icon.ico" ^
   %EXTRA_DATA% ^
   --hidden-import PIL ^
   --hidden-import PIL.ImageTk ^
@@ -31,7 +32,11 @@ python -m PyInstaller --noconfirm --onefile --windowed ^
   --hidden-import keyboard ^
   --hidden-import mouse ^
   --hidden-import customtkinter ^
-  --hidden-import updater ^
+  --hidden-import src.capture ^
+  --hidden-import src.translator ^
+  --hidden-import src.overlay ^
+  --hidden-import src.ui_theme ^
+  --hidden-import src.updater ^
   --collect-all customtkinter ^
   --collect-all mss ^
   main.py

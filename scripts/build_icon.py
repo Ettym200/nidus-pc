@@ -3,9 +3,9 @@ from pathlib import Path
 
 from PIL import Image
 
-ROOT = Path(__file__).resolve().parent
-SRC = ROOT / "icon.png"
-DST = ROOT / "icon.ico"
+ROOT = Path(__file__).resolve().parent.parent
+SRC = ROOT / "assets" / "icon.png"
+DST = ROOT / "assets" / "icon.ico"
 
 SIZES = [(256, 256), (128, 128), (64, 64), (48, 48), (32, 32), (16, 16)]
 

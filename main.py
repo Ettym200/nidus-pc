@@ -44,11 +44,11 @@ import keyboard
 import mouse
 import customtkinter as ctk
 from PIL import Image
-from capture import ScreenCapture
-from translator import Translator, KNOWN_PROVIDERS
-from overlay import Overlay
-import ui_theme as theme
-from updater import check_update
+from src.capture import ScreenCapture
+from src.translator import Translator, KNOWN_PROVIDERS
+from src.overlay import Overlay
+from src import ui_theme as theme
+from src.updater import check_update
 
 CONFIG_FILE = os.path.join(APP_DIR, "config.json")
 APP_VERSION = "1.0.3"
@@ -113,10 +113,12 @@ PROVIDER_HINTS = {
 def _resource_path(name: str) -> str:
     if os.path.isabs(name) and os.path.exists(name):
         return name
-    bundled = os.path.join(getattr(sys, "_MEIPASS", APP_DIR), name)
+    rel = os.path.join("assets", name)
+    base = getattr(sys, "_MEIPASS", APP_DIR)
+    bundled = os.path.join(base, rel)
     if os.path.exists(bundled):
         return bundled
-    local = os.path.join(APP_DIR, name)
+    local = os.path.join(APP_DIR, rel)
     if os.path.exists(local):
         return local
     return bundled

@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 title Nidus - Instalador
-cd /d "%~dp0"
+cd /d "%~dp0\.."
 
 echo.
 echo  ================================
@@ -89,7 +89,7 @@ if exist "%TEMP%\python_installer.exe" del "%TEMP%\python_installer.exe"
 echo.
 echo  ================================
 echo   Tudo pronto!
-echo   Execute: iniciar.bat
+echo   Execute: scripts\iniciar.bat
 echo  ================================
 echo.
 pause

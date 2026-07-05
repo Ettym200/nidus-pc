@@ -62,8 +62,8 @@ Use o link de download acima. Não precisa instalar Python.
 
 1. Instale o [Python 3.8+](https://www.python.org/downloads/) — marque **"Add Python to PATH"**
 2. Clone ou baixe este repositório
-3. Execute `instalar.bat` — instala todas as dependências automaticamente
-4. Execute `iniciar.bat` para abrir o app
+3. Execute `scripts\instalar.bat` — instala todas as dependências automaticamente
+4. Execute `scripts\iniciar.bat` para abrir o app
 
 > O app pede permissão de administrador automaticamente — necessário para os atalhos funcionarem dentro do jogo.
 
@@ -73,7 +73,7 @@ Use o link de download acima. Não precisa instalar Python.
 git clone https://github.com/Ettym200/nidus-pc
 cd nidus-pc
 pip install -r requirements.txt
-bash iniciar.sh
+bash scripts/iniciar.sh
 ```
 
 > No Wayland, captura de tela e atalhos globais podem ter limitações. Se não funcionar, tente com `sudo`.
@@ -133,12 +133,25 @@ Para trocar um atalho: clique no campo correspondente e pressione a tecla ou bot
 
 ---
 
+## Estrutura do projeto
+
+```
+nidus-pc/
+├── main.py           # entrada do app
+├── src/              # código Python
+├── assets/           # ícones e imagens
+├── scripts/          # instalar, iniciar e compilar
+└── docs/             # screenshots
+```
+
+---
+
 ## Compilar em .exe
 
 Para gerar um executável standalone localmente:
 
 ```
-compilar.bat
+scripts\compilar.bat
 ```
 
 O arquivo gerado fica em `dist\Nidus.exe`. Para distribuir, publique em [Releases](https://github.com/Ettym200/nidus-pc/releases).

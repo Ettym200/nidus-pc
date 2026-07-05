@@ -1,7 +1,7 @@
 import tkinter as tk
 import threading
 
-import ui_theme as theme
+from src import ui_theme as theme
 
 HANDLE_SIZE = 12
 
