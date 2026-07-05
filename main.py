@@ -51,7 +51,7 @@ import ui_theme as theme
 from updater import check_update
 
 CONFIG_FILE = os.path.join(APP_DIR, "config.json")
-APP_VERSION = "1.0.2"
+APP_VERSION = "1.0.3"
 RELEASES_URL = "https://github.com/Ettym200/nidus-pc/releases/latest"
 
 DEFAULT_CONFIG = {
@@ -701,21 +701,25 @@ class App(ctk.CTk):
     def _open_keys(self):
         win = ctk.CTkToplevel(self)
         win.title("Gerenciar API Keys")
-        win.geometry("500x500")
-        win.resizable(False, False)
+        win.geometry("500x620")
+        win.minsize(480, 520)
+        win.resizable(True, True)
         win.attributes("-topmost", True)
         win.configure(fg_color=theme.BG)
 
+        scroll = ctk.CTkScrollableFrame(win, fg_color=theme.BG, corner_radius=0)
+        scroll.pack(fill="both", expand=True, padx=8, pady=8)
+
         ctk.CTkLabel(
-            win, text="Gerenciar API Keys",
+            scroll, text="Gerenciar API Keys",
             font=(theme.FONT, 16, "bold"), text_color=theme.ACCENT,
-        ).pack(pady=(20, 4))
+        ).pack(pady=(12, 4))
         theme.hint_label(
-            win, "Salve várias keys e troque com um clique quando bater o limite.",
+            scroll, "Salve várias keys e troque com um clique quando bater o limite.",
         ).pack(pady=(0, 12))
 
-        frame_list = theme.card(win)
-        frame_list.pack(fill="x", padx=16, pady=(0, 8))
+        frame_list = theme.card(scroll)
+        frame_list.pack(fill="x", padx=8, pady=(0, 8))
         theme.section_title(frame_list, "Keys salvas").pack(anchor="w", padx=12, pady=(10, 6))
 
         lb_frame = ctk.CTkFrame(frame_list, fg_color=theme.SURFACE_ALT, corner_radius=theme.CORNER_SM)
@@ -723,7 +727,7 @@ class App(ctk.CTk):
         self._keys_listbox = tk.Listbox(
             lb_frame, bg=theme.SURFACE_ALT, fg=theme.TEXT,
             selectbackground=theme.ACCENT, selectforeground="white",
-            font=(theme.FONT, 11), height=6, relief="flat",
+            font=(theme.FONT, 11), height=4, relief="flat",
             activestyle="none", highlightthickness=0, bd=0,
         )
         self._keys_listbox.pack(fill="x", padx=4, pady=4)
@@ -737,8 +741,8 @@ class App(ctk.CTk):
         )
         theme.danger_btn(btn_frame, "Remover", self._remove_selected_key, width=100).pack(side="left")
 
-        frame_new = theme.card(win)
-        frame_new.pack(fill="x", padx=16, pady=(0, 8))
+        frame_new = theme.card(scroll)
+        frame_new.pack(fill="x", padx=8, pady=(0, 12))
         frame_new.columnconfigure(1, weight=1)
         theme.section_title(frame_new, "Adicionar nova key").grid(
             row=0, column=0, columnspan=2, sticky="w", padx=12, pady=(10, 8),
