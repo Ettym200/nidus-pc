@@ -85,6 +85,32 @@ PROVIDER_HINTS = {
 }
 
 
+def _resource_path(name: str) -> str:
+    base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base, name)
+
+
+def _set_window_icon(window):
+    ico = _resource_path("icon.ico")
+    png = _resource_path("icon.png")
+    for setter in (
+        lambda: window.iconbitmap(default=ico),
+        lambda: window.wm_iconbitmap(ico),
+        lambda: window.tk.call("wm", "iconbitmap", window._w, ico),
+    ):
+        try:
+            setter()
+            return
+        except Exception:
+            pass
+    try:
+        icon = tk.PhotoImage(file=png)
+        window.iconphoto(True, icon)
+        window._nidus_icon = icon
+    except Exception:
+        pass
+
+
 class App(ctk.CTk):
     LANGUAGES = [
         "Português", "Inglês", "Espanhol", "Japonês", "Francês", "Alemão",
@@ -102,14 +128,8 @@ class App(ctk.CTk):
         self.geometry("540x720")
         self.minsize(540, 600)
         self.configure(fg_color=theme.BG)
-        try:
-            self.iconbitmap("icon.ico")
-        except Exception:
-            try:
-                icon = tk.PhotoImage(file="icon.png")
-                self.iconphoto(True, icon)
-            except Exception:
-                pass
+        _set_window_icon(self)
+        self.after(200, lambda: _set_window_icon(self))
 
         self.config = load_config()
         self.running = False

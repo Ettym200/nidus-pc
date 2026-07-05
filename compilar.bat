@@ -11,7 +11,7 @@ echo.
 pip install pyinstaller >nul 2>&1
 
 echo  Convertendo icone...
-python -c "from PIL import Image; img = Image.open('icon.png'); img.save('icon.ico', format='ICO', sizes=[(256,256),(128,128),(64,64),(32,32),(16,16)])"
+python build_icon.py
 
 echo  Gerando executavel...
 echo.
@@ -21,6 +21,7 @@ python -m PyInstaller --noconfirm --onefile --windowed ^
   --icon "icon.ico" ^
   --add-data "code.jpeg;." ^
   --add-data "icon.png;." ^
+  --add-data "icon.ico;." ^
   --hidden-import PIL ^
   --hidden-import PIL.ImageTk ^
   --hidden-import mss ^
