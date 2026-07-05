@@ -16,15 +16,17 @@ if not _is_admin():
     sys.exit(0)
 
 import tkinter as tk
-from tkinter import ttk
 import threading
 import json
 import os
 import keyboard
+import mouse
+import customtkinter as ctk
 from PIL import Image
 from capture import ScreenCapture
 from translator import Translator, KNOWN_PROVIDERS
 from overlay import Overlay
+import ui_theme as theme
 
 CONFIG_FILE = "config.json"
 
@@ -57,6 +59,23 @@ def save_config(config):
 
 PROVIDER_LIST = list(KNOWN_PROVIDERS.keys())
 
+MOUSE_HOTKEY_PREFIX = "mouse:"
+MOUSE_BUTTON_MAP = {1: "left", 2: "middle", 3: "right", 4: "x", 5: "x2"}
+MOUSE_DISPLAY = {
+    "left": "Botão Esquerdo",
+    "middle": "Botão Meio",
+    "right": "Botão Direito",
+    "x": "Mouse 4",
+    "x2": "Mouse 5",
+}
+MOUSE_TO_LIB = {
+    "left": mouse.LEFT,
+    "middle": mouse.MIDDLE,
+    "right": mouse.RIGHT,
+    "x": mouse.X,
+    "x2": mouse.X2,
+}
+
 PROVIDER_HINTS = {
     "openai":     "Modelo: gpt-4o-mini  |  openai.com",
     "anthropic":  "Modelo: claude-haiku  |  anthropic.com",
@@ -66,18 +85,31 @@ PROVIDER_HINTS = {
 }
 
 
-class App(tk.Tk):
+class App(ctk.CTk):
+    LANGUAGES = [
+        "Português", "Inglês", "Espanhol", "Japonês", "Francês", "Alemão",
+        "Italiano", "Coreano", "Chinês Simplificado", "Chinês Tradicional",
+        "Russo", "Árabe", "Hindi", "Turco", "Polonês", "Holandês",
+        "Sueco", "Norueguês", "Dinamarquês", "Finlandês", "Grego",
+        "Hebraico", "Tailandês", "Vietnamita", "Indonésio", "Malaio",
+        "Romeno", "Húngaro", "Tcheco", "Eslovaco", "Croata", "Ucraniano",
+    ]
+
     def __init__(self):
+        theme.setup_theme()
         super().__init__()
-        self.title("Game Translator")
-        self.geometry("520x700")
-        self.resizable(False, True)
-        self.configure(bg="#1a1a2e")
+        self.title("Nidus")
+        self.geometry("540x720")
+        self.minsize(540, 600)
+        self.configure(fg_color=theme.BG)
         try:
-            icon = tk.PhotoImage(file="incone.png")
-            self.iconphoto(True, icon)
+            self.iconbitmap("icon.ico")
         except Exception:
-            pass
+            try:
+                icon = tk.PhotoImage(file="icon.png")
+                self.iconphoto(True, icon)
+            except Exception:
+                pass
 
         self.config = load_config()
         self.running = False
@@ -87,176 +119,349 @@ class App(tk.Tk):
 
         self._build_ui()
         self._register_hotkeys()
+        self._on_mode_change()
+
+    # ── UI principal ─────────────────────────────────────────────────────
 
     def _build_ui(self):
-        style = ttk.Style(self)
-        style.theme_use("clam")
-        style.configure("TLabel", background="#1a1a2e", foreground="#eaeaea", font=("Segoe UI", 10))
-        style.configure("TEntry", fieldbackground="#16213e", foreground="#eaeaea")
-        style.configure("TButton", background="#0f3460", foreground="#eaeaea", font=("Segoe UI", 10))
-        style.configure("TCombobox", fieldbackground="#16213e", foreground="#eaeaea", background="#16213e", selectbackground="#16213e", selectforeground="#eaeaea")
-        style.map("TCombobox", fieldbackground=[("readonly", "#16213e")], foreground=[("readonly", "#eaeaea")], background=[("readonly", "#16213e")])
+        self.tabs = ctk.CTkTabview(
+            self, fg_color=theme.BG,
+            segmented_button_fg_color=theme.SURFACE,
+            segmented_button_selected_color=theme.SECONDARY,
+            segmented_button_selected_hover_color="#1a4a80",
+            segmented_button_unselected_color=theme.SURFACE,
+            segmented_button_unselected_hover_color=theme.SURFACE_ALT,
+            text_color=theme.TEXT_DIM,
+        )
+        self.tabs.pack(fill="both", expand=True, padx=12, pady=12)
 
-        # Canvas com scrollbar para acomodar todo o conteúdo
-        canvas = tk.Canvas(self, bg="#1a1a2e", highlightthickness=0)
-        scrollbar = tk.Scrollbar(self, orient="vertical", command=canvas.yview)
-        canvas.configure(yscrollcommand=scrollbar.set)
-        scrollbar.pack(side="right", fill="y")
-        canvas.pack(side="left", fill="both", expand=True)
+        tab_game = self.tabs.add("Jogo")
+        tab_text = self.tabs.add("Traduzir Texto")
 
-        inner = tk.Frame(canvas, bg="#1a1a2e")
-        canvas_window = canvas.create_window((0, 0), window=inner, anchor="nw")
+        self._build_game_tab(tab_game)
+        self._build_text_tab(tab_text)
 
-        def _on_resize(e):
-            canvas.itemconfig(canvas_window, width=e.width)
-        canvas.bind("<Configure>", _on_resize)
+    def _build_game_tab(self, parent):
+        parent.configure(fg_color=theme.BG)
+        scroll = ctk.CTkScrollableFrame(parent, fg_color=theme.BG, corner_radius=0)
+        scroll.pack(fill="both", expand=True)
+        f = scroll
+        pad = {"padx": 4, "pady": 6}
 
-        def _on_frame_configure(e):
-            canvas.configure(scrollregion=canvas.bbox("all"))
-        inner.bind("<Configure>", _on_frame_configure)
+        ctk.CTkLabel(
+            f, text="Nidus",
+            font=(theme.FONT, 18, "bold"), text_color=theme.ACCENT,
+        ).pack(pady=(12, 4))
+        ctk.CTkLabel(
+            f, text="Tradução simultânea de legendas de jogos",
+            font=(theme.FONT, 11), text_color=theme.TEXT_MUTED,
+        ).pack(pady=(0, 12))
 
-        def _on_mousewheel(e):
-            canvas.yview_scroll(int(-1 * (e.delta / 120)), "units")
-        canvas.bind_all("<MouseWheel>", _on_mousewheel)
-
-        f = inner  # todos os widgets usam f como parent
-        pad = {"padx": 16, "pady": 6}
-
-        tk.Label(f, text="Game Translator", bg="#1a1a2e", fg="#e94560",
-                 font=("Segoe UI", 16, "bold")).pack(pady=(20, 4))
-        tk.Label(f, text="Tradução simultânea de legendas de jogos",
-                 bg="#1a1a2e", fg="#aaaaaa", font=("Segoe UI", 9)).pack(pady=(0, 12))
-
-        # API
-        frame_api = tk.LabelFrame(f, text=" Configuração da API ", bg="#1a1a2e", fg="#e94560",
-                                   font=("Segoe UI", 9, "bold"), bd=1, relief="groove")
+        # ── Configuração da API (sempre visível) ───────────────────────
+        frame_api = theme.card(f)
         frame_api.pack(fill="x", **pad)
         frame_api.columnconfigure(1, weight=1)
+        theme.section_title(frame_api, "Configuração da API").grid(
+            row=0, column=0, columnspan=2, sticky="w", padx=14, pady=(12, 8),
+        )
 
-        tk.Label(frame_api, text="Provedor:", bg="#1a1a2e", fg="#eaeaea").grid(row=0, column=0, sticky="w", padx=8, pady=4)
+        theme.field_label(frame_api, "Provedor:").grid(
+            row=1, column=0, sticky="w", padx=14, pady=4,
+        )
         self.provider_var = tk.StringVar(value=self.config["api_provider"])
-        providers = ttk.Combobox(frame_api, textvariable=self.provider_var,
-                                  values=PROVIDER_LIST, width=18, state="readonly")
-        providers.grid(row=0, column=1, sticky="w", padx=8, pady=4)
-        providers.bind("<<ComboboxSelected>>", self._on_provider_change)
+        theme.combo(
+            frame_api, PROVIDER_LIST, variable=self.provider_var,
+            command=self._on_provider_change, width=200,
+        ).grid(row=1, column=1, sticky="w", padx=14, pady=4)
 
         self.hint_var = tk.StringVar(value=PROVIDER_HINTS.get(self.config["api_provider"], ""))
-        self.hint_label = tk.Label(frame_api, textvariable=self.hint_var, bg="#1a1a2e",
-                                    fg="#666699", font=("Segoe UI", 8), wraplength=360)
-        self.hint_label.grid(row=1, column=0, columnspan=2, sticky="w", padx=8, pady=(0, 4))
+        ctk.CTkLabel(
+            frame_api, textvariable=self.hint_var,
+            font=(theme.FONT, 10), text_color=theme.TEXT_MUTED,
+            anchor="w", wraplength=400, justify="left",
+        ).grid(row=2, column=0, columnspan=2, sticky="w", padx=14, pady=(0, 6))
 
-        tk.Label(frame_api, text="API Key:", bg="#1a1a2e", fg="#eaeaea").grid(row=2, column=0, sticky="w", padx=8, pady=4)
+        theme.field_label(frame_api, "API Key:").grid(row=3, column=0, sticky="w", padx=14, pady=4)
         self.api_key_var = tk.StringVar(value=self.config["api_key"])
-        tk.Entry(frame_api, textvariable=self.api_key_var, show="*", width=36,
-                 bg="#16213e", fg="#eaeaea", insertbackground="white", relief="flat").grid(row=2, column=1, padx=8, pady=4, sticky="ew")
+        theme.entry(frame_api, textvariable=self.api_key_var, show="*", width=300).grid(
+            row=3, column=1, sticky="ew", padx=14, pady=4,
+        )
 
-        # Base URL customizada
-        tk.Label(frame_api, text="Base URL:", bg="#1a1a2e", fg="#eaeaea").grid(row=3, column=0, sticky="w", padx=8, pady=4)
+        theme.field_label(frame_api, "Base URL:").grid(row=4, column=0, sticky="w", padx=14, pady=4)
         self.base_url_var = tk.StringVar(value=self.config["custom_base_url"])
-        self.base_url_entry = tk.Entry(frame_api, textvariable=self.base_url_var, width=36,
-                                        bg="#16213e", fg="#eaeaea", insertbackground="white", relief="flat")
-        self.base_url_entry.grid(row=3, column=1, padx=8, pady=4, sticky="ew")
+        self.base_url_entry = theme.entry(frame_api, textvariable=self.base_url_var, width=300)
+        self.base_url_entry.grid(row=4, column=1, sticky="ew", padx=14, pady=4)
 
-        # Modelo
-        tk.Label(frame_api, text="Modelo:", bg="#1a1a2e", fg="#eaeaea").grid(row=4, column=0, sticky="w", padx=8, pady=4)
+        theme.field_label(frame_api, "Modelo:").grid(row=5, column=0, sticky="w", padx=14, pady=4)
         self.model_var = tk.StringVar(value=self.config["model"])
-        tk.Entry(frame_api, textvariable=self.model_var, width=36,
-                 bg="#16213e", fg="#aaaaaa", insertbackground="white", relief="flat",
-                 ).grid(row=4, column=1, padx=8, pady=4, sticky="ew")
-        tk.Label(frame_api, text="(deixe vazio para usar o padrão do provedor)",
-                 bg="#1a1a2e", fg="#555577", font=("Segoe UI", 8)).grid(row=5, column=1, sticky="w", padx=8)
+        theme.entry(frame_api, textvariable=self.model_var, width=300).grid(
+            row=5, column=1, sticky="ew", padx=14, pady=4,
+        )
+        theme.hint_label(frame_api, "(deixe vazio para usar o padrão do provedor)").grid(
+            row=6, column=1, sticky="w", padx=14,
+        )
 
-        tk.Button(frame_api, text="🔑 Gerenciar Keys", command=self._open_keys,
-                  bg="#e94560", fg="white", relief="flat", cursor="hand2",
-                  font=("Segoe UI", 9, "bold")).grid(row=6, column=0, columnspan=2, pady=8, padx=8, sticky="ew")
+        theme.primary_btn(
+            frame_api, "Gerenciar Keys", self._open_keys,
+            height=36, font=(theme.FONT, 11, "bold"),
+        ).grid(row=7, column=0, columnspan=2, pady=(10, 14), padx=14, sticky="ew")
 
         self._update_url_state()
 
-        # Tradução
-        frame_trans = tk.LabelFrame(f, text=" Tradução ", bg="#1a1a2e", fg="#e94560",
-                                     font=("Segoe UI", 9, "bold"), bd=1, relief="groove")
+        # ── Tradução ─────────────────────────────────────────────────────
+        frame_trans = theme.card(f)
         frame_trans.pack(fill="x", **pad)
 
-        tk.Label(frame_trans, text="Traduzir para:", bg="#1a1a2e", fg="#eaeaea").grid(row=0, column=0, sticky="w", padx=8, pady=4)
+        theme.section_title(frame_trans, "Tradução").grid(
+            row=0, column=0, columnspan=2, sticky="w", padx=14, pady=(12, 8),
+        )
+
+        theme.field_label(frame_trans, "Traduzir para:").grid(
+            row=1, column=0, sticky="w", padx=14, pady=4,
+        )
         self.lang_var = tk.StringVar(value=self.config["target_language"])
-        langs = ttk.Combobox(frame_trans, textvariable=self.lang_var,
-                              values=["Português", "Inglês", "Espanhol", "Japonês", "Francês"], width=16, state="readonly")
-        langs.grid(row=0, column=1, sticky="w", padx=8, pady=4)
+        theme.combo(frame_trans, self.LANGUAGES, variable=self.lang_var, width=220).grid(
+            row=1, column=1, sticky="w", padx=14, pady=4,
+        )
 
-        tk.Label(frame_trans, text="Modo:", bg="#1a1a2e", fg="#eaeaea").grid(row=1, column=0, sticky="w", padx=8, pady=4)
+        theme.field_label(frame_trans, "Modo:").grid(row=2, column=0, sticky="w", padx=14, pady=4)
+        frame_mode = ctk.CTkFrame(frame_trans, fg_color="transparent")
+        frame_mode.grid(row=2, column=1, sticky="w", padx=14, pady=4)
         self.mode_var = tk.StringVar(value=self.config.get("mode", "once"))
-        frame_mode = tk.Frame(frame_trans, bg="#1a1a2e")
-        frame_mode.grid(row=1, column=1, sticky="w", padx=8, pady=4)
-        tk.Radiobutton(frame_mode, text="Traduzir uma vez", variable=self.mode_var, value="once",
-                       bg="#1a1a2e", fg="#eaeaea", selectcolor="#0f3460",
-                       command=self._on_mode_change).pack(side="left", padx=(0, 12))
-        tk.Radiobutton(frame_mode, text="Contínuo", variable=self.mode_var, value="continuous",
-                       bg="#1a1a2e", fg="#eaeaea", selectcolor="#0f3460",
-                       command=self._on_mode_change).pack(side="left")
+        ctk.CTkRadioButton(
+            frame_mode, text="Traduzir uma vez", variable=self.mode_var, value="once",
+            command=self._on_mode_change,
+            font=(theme.FONT, 11), text_color=theme.TEXT,
+            fg_color=theme.ACCENT, hover_color="#c73a52",
+        ).pack(side="left", padx=(0, 12))
+        ctk.CTkRadioButton(
+            frame_mode, text="Contínuo", variable=self.mode_var, value="continuous",
+            command=self._on_mode_change,
+            font=(theme.FONT, 11), text_color=theme.TEXT,
+            fg_color=theme.ACCENT, hover_color="#c73a52",
+        ).pack(side="left")
 
-        self.interval_frame = tk.Frame(frame_trans, bg="#1a1a2e")
-        self.interval_frame.grid(row=2, column=0, columnspan=2, sticky="w")
-        tk.Label(self.interval_frame, text="Intervalo (s):", bg="#1a1a2e", fg="#eaeaea").pack(side="left", padx=8, pady=4)
+        self.interval_frame = ctk.CTkFrame(frame_trans, fg_color="transparent")
+        self.interval_frame.grid(row=3, column=0, columnspan=2, sticky="w", padx=14, pady=4)
+        theme.field_label(self.interval_frame, "Intervalo (s):").pack(side="left")
         self.interval_var = tk.DoubleVar(value=self.config["capture_interval"])
-        tk.Scale(self.interval_frame, variable=self.interval_var, from_=0.5, to=5.0, resolution=0.5,
-                 orient="horizontal", bg="#1a1a2e", fg="#eaeaea", highlightthickness=0,
-                 troughcolor="#16213e", length=200).pack(side="left", pady=4)
+        ctk.CTkSlider(
+            self.interval_frame, from_=0.5, to=5.0, number_of_steps=9,
+            variable=self.interval_var,
+            fg_color=theme.SURFACE_ALT, progress_color=theme.ACCENT,
+            button_color=theme.ACCENT, button_hover_color="#c73a52",
+            width=220,
+        ).pack(side="left", padx=(8, 0), pady=4)
 
-        # Região
-        frame_region = tk.LabelFrame(f, text=" Região Monitorada ", bg="#1a1a2e", fg="#e94560",
-                                      font=("Segoe UI", 9, "bold"), bd=1, relief="groove")
+        # ── Região monitorada ────────────────────────────────────────────
+        frame_region = theme.card(f)
         frame_region.pack(fill="x", **pad)
 
-        self.region_label = tk.Label(frame_region, text=self._region_text(), bg="#1a1a2e", fg="#aaaaaa")
-        self.region_label.pack(side="left", padx=8, pady=6)
-        tk.Button(frame_region, text="Selecionar região", command=self._select_region,
-                  bg="#0f3460", fg="#eaeaea", relief="flat", cursor="hand2").pack(side="right", padx=8, pady=6)
+        theme.section_title(frame_region, "Região Monitorada").pack(
+            anchor="w", padx=14, pady=(12, 6),
+        )
 
-        # Hotkeys
-        frame_hotkey = tk.LabelFrame(f, text=" Atalhos de Teclado ", bg="#1a1a2e", fg="#e94560",
-                                      font=("Segoe UI", 9, "bold"), bd=1, relief="groove")
+        mon_row = ctk.CTkFrame(frame_region, fg_color="transparent")
+        mon_row.pack(fill="x", padx=14, pady=(0, 6))
+        theme.field_label(mon_row, "Monitor:").pack(side="left")
+        self.monitor_var = tk.StringVar()
+        self._monitors = self._get_monitors()
+        mon_names = [
+            f"Monitor {i+1}  ({m['width']}×{m['height']}  +{m['left']},+{m['top']})"
+            for i, m in enumerate(self._monitors)
+        ]
+        saved_mon = self.config.get("monitor_index", 0)
+        self.monitor_var.set(mon_names[min(saved_mon, len(mon_names) - 1)])
+        theme.combo(mon_row, mon_names, variable=self.monitor_var, width=340).pack(
+            side="left", padx=(8, 0),
+        )
+
+        region_row = ctk.CTkFrame(frame_region, fg_color="transparent")
+        region_row.pack(fill="x", padx=14, pady=(0, 14))
+        self.region_label = ctk.CTkLabel(
+            region_row, text=self._region_text(),
+            font=(theme.FONT, 10), text_color=theme.TEXT_MUTED,
+        )
+        self.region_label.pack(side="left")
+        theme.secondary_btn(
+            region_row, "Selecionar região", self._select_region, width=140,
+        ).pack(side="right")
+
+        # ── Atalhos ──────────────────────────────────────────────────────
+        frame_hotkey = theme.card(f)
         frame_hotkey.pack(fill="x", **pad)
         frame_hotkey.columnconfigure(1, weight=1)
 
-        tk.Label(frame_hotkey, text="Selecionar região:", bg="#1a1a2e", fg="#eaeaea").grid(row=0, column=0, sticky="w", padx=8, pady=4)
+        theme.section_title(frame_hotkey, "Atalhos").grid(
+            row=0, column=0, columnspan=2, sticky="w", padx=14, pady=(12, 8),
+        )
+
+        theme.field_label(frame_hotkey, "Selecionar região:").grid(
+            row=1, column=0, sticky="w", padx=14, pady=4,
+        )
         self.hotkey_region_var = tk.StringVar(value=self.config.get("hotkey_region", "f9"))
-        self._make_hotkey_entry(frame_hotkey, self.hotkey_region_var, row=0)
+        self._make_hotkey_entry(frame_hotkey, self.hotkey_region_var, row=1)
 
-        tk.Label(frame_hotkey, text="Traduzir agora:", bg="#1a1a2e", fg="#eaeaea").grid(row=1, column=0, sticky="w", padx=8, pady=4)
+        theme.field_label(frame_hotkey, "Traduzir agora:").grid(
+            row=2, column=0, sticky="w", padx=14, pady=4,
+        )
         self.hotkey_translate_var = tk.StringVar(value=self.config.get("hotkey_translate", "f10"))
-        self._make_hotkey_entry(frame_hotkey, self.hotkey_translate_var, row=1)
+        self._make_hotkey_entry(frame_hotkey, self.hotkey_translate_var, row=2)
 
-        tk.Label(frame_hotkey, text="Mostrar/ocultar tradução:", bg="#1a1a2e", fg="#eaeaea").grid(row=2, column=0, sticky="w", padx=8, pady=4)
+        theme.field_label(frame_hotkey, "Mostrar/ocultar tradução:").grid(
+            row=3, column=0, sticky="w", padx=14, pady=4,
+        )
         self.hotkey_toggle_var = tk.StringVar(value=self.config.get("hotkey_toggle", "f11"))
-        self._make_hotkey_entry(frame_hotkey, self.hotkey_toggle_var, row=2)
+        self._make_hotkey_entry(frame_hotkey, self.hotkey_toggle_var, row=3)
 
-        tk.Label(frame_hotkey, text="(clique no campo e pressione a tecla desejada)",
-                 bg="#1a1a2e", fg="#555577", font=("Segoe UI", 8)).grid(row=3, column=0, columnspan=2, sticky="w", padx=8, pady=(0, 4))
+        theme.hint_label(
+            frame_hotkey,
+            "(clique no campo e pressione uma tecla ou botão do mouse)",
+        ).grid(row=4, column=0, columnspan=2, sticky="w", padx=14, pady=(0, 14))
 
-        # Status
+        # ── Status e ações ───────────────────────────────────────────────
         self.status_var = tk.StringVar(value="Parado")
-        tk.Label(f, textvariable=self.status_var, bg="#1a1a2e", fg="#aaaaaa",
-                 font=("Segoe UI", 9)).pack(pady=(8, 0))
+        ctk.CTkLabel(
+            f, textvariable=self.status_var,
+            font=(theme.FONT, 11), text_color=theme.TEXT_DIM,
+        ).pack(pady=(8, 0))
 
         self.last_text_var = tk.StringVar(value="")
-        tk.Label(f, textvariable=self.last_text_var, bg="#1a1a2e", fg="#e94560",
-                 font=("Segoe UI", 9, "italic"), wraplength=460).pack(pady=(2, 8))
+        ctk.CTkLabel(
+            f, textvariable=self.last_text_var,
+            font=(theme.FONT, 11, "italic"), text_color=theme.ACCENT,
+            wraplength=460, justify="left",
+        ).pack(pady=(2, 8))
 
-        self.btn_start = tk.Button(f, text="▶  Iniciar Tradução", command=self._toggle,
-                                    bg="#e94560", fg="white", font=("Segoe UI", 12, "bold"),
-                                    relief="flat", cursor="hand2", height=2)
-        self.btn_start.pack(fill="x", padx=16, pady=(8, 4))
+        self.btn_start = theme.primary_btn(f, "Iniciar Tradução", self._toggle, height=48)
+        self.btn_start.pack(fill="x", padx=4, pady=(8, 4))
 
-        tk.Button(f, text="Salvar configurações", command=self._save,
-                  bg="#0f3460", fg="#eaeaea", relief="flat", cursor="hand2").pack(pady=4)
+        theme.secondary_btn(f, "Salvar configurações", self._save).pack(fill="x", padx=4, pady=4)
+        theme.secondary_btn(f, "Como usar", self._open_help).pack(fill="x", padx=4, pady=4)
+        theme.success_btn(f, "Apoiar via Pix", self._open_donation).pack(
+            fill="x", padx=4, pady=(0, 16),
+        )
 
-        tk.Button(f, text="?  Como usar", command=self._open_help,
-                  bg="#0f3460", fg="#eaeaea", font=("Segoe UI", 9),
-                  relief="flat", cursor="hand2").pack(pady=(0, 4))
+    def _build_text_tab(self, parent):
+        parent.configure(fg_color=theme.BG)
 
-        tk.Button(f, text="❤  Apoiar via Pix", command=self._open_donation,
-                  bg="#1a6b3a", fg="#ffffff", font=("Segoe UI", 9),
-                  relief="flat", cursor="hand2").pack(pady=(0, 20))
+        top = ctk.CTkFrame(parent, fg_color="transparent")
+        top.pack(fill="x", padx=12, pady=(12, 6))
+
+        theme.field_label(top, "Traduzir para:").pack(side="left")
+        self.text_lang_var = tk.StringVar(value=self.config.get("target_language", "Português"))
+        theme.combo(top, self.LANGUAGES, variable=self.text_lang_var, width=180).pack(
+            side="left", padx=(6, 12),
+        )
+
+        self.btn_translate_text = theme.primary_btn(
+            top, "Traduzir", self._do_text_translate, height=34, width=100,
+            font=(theme.FONT, 11, "bold"),
+        )
+        self.btn_translate_text.pack(side="left")
+
+        self.text_status_var = tk.StringVar(value="")
+        ctk.CTkLabel(
+            top, textvariable=self.text_status_var,
+            font=(theme.FONT, 10), text_color=theme.TEXT_DIM,
+        ).pack(side="left", padx=10)
+
+        theme.ghost_btn(
+            top, "Limpar", lambda: self.text_input.delete("1.0", "end"), width=70,
+        ).pack(side="right")
+
+        paned = tk.PanedWindow(
+            parent, orient="vertical", bg=theme.BORDER,
+            sashwidth=5, sashrelief="flat", sashpad=0,
+        )
+        paned.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+
+        frame_in = tk.Frame(paned, bg=theme.SURFACE)
+        paned.add(frame_in, minsize=80)
+
+        ctk.CTkLabel(
+            frame_in, text="Texto original",
+            font=(theme.FONT, 10), text_color=theme.TEXT_MUTED, bg_color=theme.SURFACE,
+        ).pack(anchor="w", padx=10, pady=(8, 2))
+
+        self.text_input = ctk.CTkTextbox(
+            frame_in, fg_color=theme.SURFACE_ALT, text_color=theme.TEXT,
+            font=(theme.FONT, 12), corner_radius=theme.CORNER_SM,
+            border_width=1, border_color=theme.BORDER,
+        )
+        self.text_input.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+
+        frame_out = tk.Frame(paned, bg=theme.SURFACE_ALT)
+        paned.add(frame_out, minsize=80)
+
+        out_hdr = tk.Frame(frame_out, bg=theme.SURFACE_ALT)
+        out_hdr.pack(fill="x", padx=10, pady=(8, 2))
+        ctk.CTkLabel(
+            out_hdr, text="Tradução",
+            font=(theme.FONT, 10), text_color=theme.TEXT_MUTED, bg_color=theme.SURFACE_ALT,
+        ).pack(side="left")
+        theme.secondary_btn(
+            out_hdr, "Copiar", self._copy_text_result, width=80, height=26,
+            font=(theme.FONT, 10),
+        ).pack(side="right")
+
+        self.text_output = ctk.CTkTextbox(
+            frame_out, fg_color=theme.BG, text_color=theme.ACCENT,
+            font=(theme.FONT, 12), corner_radius=theme.CORNER_SM,
+            border_width=1, border_color=theme.BORDER,
+        )
+        self.text_output.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        self.text_output.configure(state="disabled")
+
+    # ── Tradução de texto ────────────────────────────────────────────────
+
+    def _do_text_translate(self):
+        text = self.text_input.get("1.0", "end").strip()
+        if not text:
+            return
+        api_key = self.api_key_var.get().strip() or self.config.get("api_key", "")
+        if not api_key:
+            self.text_status_var.set("Configure a API Key na aba Jogo")
+            return
+
+        self.btn_translate_text.configure(state="disabled", text="Traduzindo...", fg_color=theme.DISABLED)
+        self.text_status_var.set("Traduzindo...")
+
+        def _run():
+            try:
+                t = Translator(
+                    api_key=api_key,
+                    provider=self.provider_var.get(),
+                    target_language=self.text_lang_var.get(),
+                    custom_base_url=self.base_url_var.get(),
+                    model=self.model_var.get(),
+                )
+                result = t.translate_text(text, self.text_lang_var.get())
+                self.after(0, lambda: self._set_text_result(result))
+                self.after(0, lambda: self.text_status_var.set("Concluído"))
+            except Exception as e:
+                self.after(0, lambda: self._set_text_result(f"Erro: {e}"))
+                self.after(0, lambda: self.text_status_var.set("Erro"))
+            finally:
+                self.after(0, lambda: self.btn_translate_text.configure(
+                    state="normal", text="Traduzir", fg_color=theme.ACCENT,
+                ))
+
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _set_text_result(self, text):
+        self.text_output.configure(state="normal")
+        self.text_output.delete("1.0", "end")
+        self.text_output.insert("1.0", text)
+        self.text_output.configure(state="disabled")
+
+    def _copy_text_result(self):
+        result = self.text_output.get("1.0", "end").strip()
+        if result:
+            self.clipboard_clear()
+            self.clipboard_append(result)
+
+    # ── Config / provedor ────────────────────────────────────────────────
 
     def _on_provider_change(self, _=None):
         self.hint_var.set(PROVIDER_HINTS.get(self.provider_var.get(), ""))
@@ -264,13 +469,24 @@ class App(tk.Tk):
 
     def _update_url_state(self):
         provider = self.provider_var.get()
-        # Base URL só editável em "custom"; nos demais é exibida como info
         if provider == "custom":
-            self.base_url_entry.config(state="normal", fg="#eaeaea")
+            self.base_url_entry.configure(state="normal")
         else:
             known_url = KNOWN_PROVIDERS.get(provider, {}).get("base_url") or "(padrão do SDK)"
             self.base_url_var.set(known_url)
-            self.base_url_entry.config(state="disabled", fg="#555577")
+            self.base_url_entry.configure(state="disabled")
+
+    def _get_monitors(self):
+        import mss
+        with mss.mss() as sct:
+            return list(sct.monitors[1:])
+
+    def _selected_monitor(self):
+        try:
+            idx = int(self.monitor_var.get().split()[1]) - 1
+        except Exception:
+            idx = 0
+        return self._monitors[min(idx, len(self._monitors) - 1)]
 
     def _region_text(self):
         r = self.config.get("region")
@@ -278,109 +494,164 @@ class App(tk.Tk):
             return f"x1={r['x1']} y1={r['y1']}  →  x2={r['x2']} y2={r['y2']}"
         return "Nenhuma selecionada"
 
-    def _make_hotkey_entry(self, parent, var, row):
-        entry = tk.Entry(parent, textvariable=var, width=12, bg="#16213e", fg="#e94560",
-                         insertbackground="white", relief="flat", font=("Segoe UI", 10, "bold"),
-                         justify="center", readonlybackground="#16213e", state="readonly")
-        entry.grid(row=row, column=1, sticky="w", padx=8, pady=4)
+    # ── Atalhos ──────────────────────────────────────────────────────────
+
+    def _hotkey_display(self, hotkey):
+        if hotkey.startswith(MOUSE_HOTKEY_PREFIX):
+            btn = hotkey[len(MOUSE_HOTKEY_PREFIX):]
+            return MOUSE_DISPLAY.get(btn, hotkey)
+        return hotkey.upper()
+
+    def _is_mouse_hotkey(self, hotkey):
+        return hotkey.startswith(MOUSE_HOTKEY_PREFIX)
+
+    def _make_hotkey_entry(self, parent, var, row, col=1):
+        entry = theme.entry(parent, width=120, justify="center")
+        entry.grid(row=row, column=col, sticky="w", padx=14, pady=4)
+
+        def show_value():
+            entry.configure(state="normal")
+            entry.delete(0, "end")
+            entry.insert(0, self._hotkey_display(var.get()))
+            entry.configure(state="disabled", text_color=theme.ACCENT)
+
+        show_value()
+
+        def stop_capture(restore=False, previous=None):
+            if restore and previous is not None:
+                var.set(previous)
+            entry.unbind("<KeyPress>")
+            self.unbind_all("<KeyPress>")
+            for btn_num in MOUSE_BUTTON_MAP:
+                self.unbind_all(f"<Button-{btn_num}>")
+            show_value()
+            self._register_hotkeys()
+
+        def on_capture_key(event):
+            key = event.keysym.lower()
+            if key == "escape":
+                stop_capture(restore=True, previous=original)
+                return "break"
+            var.set(key)
+            stop_capture()
+            return "break"
+
+        def on_capture_button(event):
+            btn = MOUSE_BUTTON_MAP.get(event.num)
+            if not btn:
+                return "break"
+            var.set(f"{MOUSE_HOTKEY_PREFIX}{btn}")
+            stop_capture()
+            return "break"
 
         def on_click(e):
-            entry.config(state="normal", fg="#ffffff")
+            nonlocal original
+            original = var.get()
+            entry.configure(state="normal", text_color=theme.TEXT)
             entry.delete(0, "end")
-            entry.insert(0, "Pressione uma tecla...")
-            entry.config(state="readonly")
-            entry.bind("<KeyPress>", lambda ev: self._capture_key(ev, var, entry))
+            entry.insert(0, "Pressione...")
             entry.focus_set()
 
+            def start_listening():
+                entry.bind("<KeyPress>", on_capture_key)
+                self.bind_all("<KeyPress>", on_capture_key)
+                for btn_num in MOUSE_BUTTON_MAP:
+                    self.bind_all(f"<Button-{btn_num}>", on_capture_button)
+
+            self.after(50, start_listening)
+
+        original = var.get()
         entry.bind("<Button-1>", on_click)
 
-    def _capture_key(self, event, var, entry):
-        key = event.keysym.lower()
-        if key in ("escape",):
-            entry.config(fg="#e94560")
-            var.set(var.get())
+    def _register_hotkey(self, hotkey, callback):
+        if not hotkey:
             return
-        var.set(key)
-        entry.config(fg="#e94560")
-        entry.unbind("<KeyPress>")
-        self._register_hotkeys()
+        if self._is_mouse_hotkey(hotkey):
+            btn = hotkey[len(MOUSE_HOTKEY_PREFIX):]
+            lib_btn = MOUSE_TO_LIB.get(btn)
+            if lib_btn is not None:
+                mouse.on_button(lambda: self.after(0, callback), buttons=(lib_btn,), types=(mouse.DOWN,))
+        else:
+            keyboard.add_hotkey(hotkey, lambda: self.after(0, callback))
 
     def _register_hotkeys(self):
         keyboard.unhook_all()
-        hk_region = self.hotkey_region_var.get()
-        hk_translate = self.hotkey_translate_var.get()
-        hk_toggle = self.hotkey_toggle_var.get()
-        if hk_region:
-            keyboard.add_hotkey(hk_region, lambda: self.after(0, self._select_region))
-        if hk_translate:
-            keyboard.add_hotkey(hk_translate, lambda: self.after(0, self._toggle))
-        if hk_toggle:
-            keyboard.add_hotkey(hk_toggle, lambda: self.after(0, self._toggle_overlay))
+        mouse.unhook_all()
+        self._register_hotkey(self.hotkey_region_var.get(), self._select_region)
+        self._register_hotkey(self.hotkey_translate_var.get(), self._toggle)
+        self._register_hotkey(self.hotkey_toggle_var.get(), self._toggle_overlay)
+
+    # ── Pop-ups ──────────────────────────────────────────────────────────
 
     def _open_keys(self):
-        win = tk.Toplevel(self)
+        win = ctk.CTkToplevel(self)
         win.title("Gerenciar API Keys")
-        win.configure(bg="#1a1a2e")
-        win.geometry("500x480")
+        win.geometry("500x500")
         win.resizable(False, False)
         win.attributes("-topmost", True)
+        win.configure(fg_color=theme.BG)
 
-        tk.Label(win, text="Gerenciar API Keys", bg="#1a1a2e", fg="#e94560",
-                 font=("Segoe UI", 14, "bold")).pack(pady=(20, 4))
-        tk.Label(win, text="Salve várias keys e troque com um clique quando bater o limite",
-                 bg="#1a1a2e", fg="#aaaaaa", font=("Segoe UI", 9)).pack(pady=(0, 12))
+        ctk.CTkLabel(
+            win, text="Gerenciar API Keys",
+            font=(theme.FONT, 16, "bold"), text_color=theme.ACCENT,
+        ).pack(pady=(20, 4))
+        theme.hint_label(
+            win, "Salve várias keys e troque com um clique quando bater o limite.",
+        ).pack(pady=(0, 12))
 
-        # Lista de perfis salvos
-        frame_list = tk.LabelFrame(win, text=" Keys salvas ", bg="#1a1a2e", fg="#e94560",
-                                    font=("Segoe UI", 9, "bold"), bd=1, relief="groove")
+        frame_list = theme.card(win)
         frame_list.pack(fill="x", padx=16, pady=(0, 8))
+        theme.section_title(frame_list, "Keys salvas").pack(anchor="w", padx=12, pady=(10, 6))
 
-        self._keys_listbox = tk.Listbox(frame_list, bg="#16213e", fg="#eaeaea",
-                                         selectbackground="#e94560", selectforeground="white",
-                                         font=("Segoe UI", 10), height=6, relief="flat",
-                                         activestyle="none")
-        self._keys_listbox.pack(fill="x", padx=8, pady=8)
+        lb_frame = ctk.CTkFrame(frame_list, fg_color=theme.SURFACE_ALT, corner_radius=theme.CORNER_SM)
+        lb_frame.pack(fill="x", padx=12, pady=(0, 8))
+        self._keys_listbox = tk.Listbox(
+            lb_frame, bg=theme.SURFACE_ALT, fg=theme.TEXT,
+            selectbackground=theme.ACCENT, selectforeground="white",
+            font=(theme.FONT, 11), height=6, relief="flat",
+            activestyle="none", highlightthickness=0, bd=0,
+        )
+        self._keys_listbox.pack(fill="x", padx=4, pady=4)
         self._keys_win = win
         self._refresh_keys_list()
 
-        btn_frame = tk.Frame(frame_list, bg="#1a1a2e")
-        btn_frame.pack(fill="x", padx=8, pady=(0, 8))
-        tk.Button(btn_frame, text="✅  Usar esta key", command=self._use_selected_key,
-                  bg="#1a6b3a", fg="white", relief="flat", cursor="hand2").pack(side="left", padx=(0, 4))
-        tk.Button(btn_frame, text="🗑  Remover", command=self._remove_selected_key,
-                  bg="#6b1a1a", fg="white", relief="flat", cursor="hand2").pack(side="left")
+        btn_frame = ctk.CTkFrame(frame_list, fg_color="transparent")
+        btn_frame.pack(fill="x", padx=12, pady=(0, 12))
+        theme.success_btn(btn_frame, "Usar esta key", self._use_selected_key, width=130).pack(
+            side="left", padx=(0, 6),
+        )
+        theme.danger_btn(btn_frame, "Remover", self._remove_selected_key, width=100).pack(side="left")
 
-        # Adicionar nova key
-        frame_new = tk.LabelFrame(win, text=" Adicionar nova key ", bg="#1a1a2e", fg="#e94560",
-                                   font=("Segoe UI", 9, "bold"), bd=1, relief="groove")
+        frame_new = theme.card(win)
         frame_new.pack(fill="x", padx=16, pady=(0, 8))
         frame_new.columnconfigure(1, weight=1)
+        theme.section_title(frame_new, "Adicionar nova key").grid(
+            row=0, column=0, columnspan=2, sticky="w", padx=12, pady=(10, 8),
+        )
 
-        tk.Label(frame_new, text="Apelido:", bg="#1a1a2e", fg="#eaeaea").grid(row=0, column=0, sticky="w", padx=8, pady=4)
-        self._new_key_name = tk.Entry(frame_new, bg="#16213e", fg="#eaeaea", insertbackground="white",
-                                       relief="flat", width=20)
-        self._new_key_name.grid(row=0, column=1, sticky="ew", padx=8, pady=4)
+        theme.field_label(frame_new, "Apelido:").grid(row=1, column=0, sticky="w", padx=12, pady=4)
+        self._new_key_name = theme.entry(frame_new, width=200)
+        self._new_key_name.grid(row=1, column=1, sticky="ew", padx=12, pady=4)
         self._new_key_name.insert(0, "Ex: Groq pessoal")
 
-        tk.Label(frame_new, text="Provedor:", bg="#1a1a2e", fg="#eaeaea").grid(row=1, column=0, sticky="w", padx=8, pady=4)
-        self._new_key_provider = ttk.Combobox(frame_new, values=PROVIDER_LIST, width=18, state="readonly")
+        theme.field_label(frame_new, "Provedor:").grid(row=2, column=0, sticky="w", padx=12, pady=4)
+        self._new_key_provider = theme.combo(frame_new, PROVIDER_LIST, width=200)
         self._new_key_provider.set(self.config.get("api_provider", "openrouter"))
-        self._new_key_provider.grid(row=1, column=1, sticky="w", padx=8, pady=4)
+        self._new_key_provider.grid(row=2, column=1, sticky="w", padx=12, pady=4)
 
-        tk.Label(frame_new, text="API Key:", bg="#1a1a2e", fg="#eaeaea").grid(row=2, column=0, sticky="w", padx=8, pady=4)
-        self._new_key_value = tk.Entry(frame_new, bg="#16213e", fg="#eaeaea", insertbackground="white",
-                                        relief="flat", width=36, show="*")
-        self._new_key_value.grid(row=2, column=1, sticky="ew", padx=8, pady=4)
+        theme.field_label(frame_new, "API Key:").grid(row=3, column=0, sticky="w", padx=12, pady=4)
+        self._new_key_value = theme.entry(frame_new, show="*", width=280)
+        self._new_key_value.grid(row=3, column=1, sticky="ew", padx=12, pady=4)
 
-        tk.Label(frame_new, text="Modelo:", bg="#1a1a2e", fg="#eaeaea").grid(row=3, column=0, sticky="w", padx=8, pady=4)
-        self._new_key_model = tk.Entry(frame_new, bg="#16213e", fg="#aaaaaa", insertbackground="white",
-                                        relief="flat", width=36)
-        self._new_key_model.grid(row=3, column=1, sticky="ew", padx=8, pady=4)
+        theme.field_label(frame_new, "Modelo:").grid(row=4, column=0, sticky="w", padx=12, pady=4)
+        self._new_key_model = theme.entry(frame_new, width=280)
+        self._new_key_model.grid(row=4, column=1, sticky="ew", padx=12, pady=4)
         self._new_key_model.insert(0, "(opcional)")
 
-        tk.Button(frame_new, text="+ Salvar key", command=self._save_new_key,
-                  bg="#e94560", fg="white", relief="flat", cursor="hand2",
-                  font=("Segoe UI", 10)).grid(row=4, column=0, columnspan=2, pady=8)
+        theme.primary_btn(
+            frame_new, "Salvar key", self._save_new_key,
+            height=36, font=(theme.FONT, 11, "bold"),
+        ).grid(row=5, column=0, columnspan=2, pady=(10, 14), padx=12, sticky="ew")
 
     def _refresh_keys_list(self):
         self._keys_listbox.delete(0, "end")
@@ -436,45 +707,49 @@ class App(tk.Tk):
         self._refresh_keys_list()
 
     def _open_help(self):
-        win = tk.Toplevel(self)
-        win.title("Como usar o Game Translator")
-        win.configure(bg="#1a1a2e")
+        win = ctk.CTkToplevel(self)
+        win.title("Como usar o Nidus")
         win.geometry("560x620")
         win.resizable(False, True)
         win.attributes("-topmost", True)
+        win.configure(fg_color=theme.BG)
 
-        canvas = tk.Canvas(win, bg="#1a1a2e", highlightthickness=0)
-        sb = tk.Scrollbar(win, orient="vertical", command=canvas.yview)
-        canvas.configure(yscrollcommand=sb.set)
-        sb.pack(side="right", fill="y")
-        canvas.pack(side="left", fill="both", expand=True)
-        f = tk.Frame(canvas, bg="#1a1a2e")
-        cw = canvas.create_window((0, 0), window=f, anchor="nw")
-        canvas.bind("<Configure>", lambda e: canvas.itemconfig(cw, width=e.width))
-        f.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-        canvas.bind_all("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
+        scroll = ctk.CTkScrollableFrame(win, fg_color=theme.BG, corner_radius=0)
+        scroll.pack(fill="both", expand=True, padx=8, pady=8)
+        f = scroll
 
         def section(title):
-            tk.Label(f, text=title, bg="#1a1a2e", fg="#e94560",
-                     font=("Segoe UI", 11, "bold")).pack(anchor="w", padx=20, pady=(16, 2))
-            tk.Frame(f, bg="#e94560", height=1).pack(fill="x", padx=20)
+            ctk.CTkLabel(
+                f, text=title, font=(theme.FONT, 12, "bold"), text_color=theme.ACCENT, anchor="w",
+            ).pack(anchor="w", padx=12, pady=(16, 2))
+            ctk.CTkFrame(f, fg_color=theme.ACCENT, height=1).pack(fill="x", padx=12)
 
         def text(msg):
-            tk.Label(f, text=msg, bg="#1a1a2e", fg="#cccccc",
-                     font=("Segoe UI", 9), wraplength=500, justify="left").pack(anchor="w", padx=28, pady=3)
+            if not msg:
+                ctk.CTkLabel(f, text="", height=4).pack()
+                return
+            ctk.CTkLabel(
+                f, text=msg, font=(theme.FONT, 11), text_color=theme.TEXT,
+                wraplength=500, justify="left", anchor="w",
+            ).pack(anchor="w", padx=20, pady=2)
 
         def step(n, msg):
-            tk.Label(f, text=f"  {n}.  {msg}", bg="#1a1a2e", fg="#eaeaea",
-                     font=("Segoe UI", 9), wraplength=490, justify="left").pack(anchor="w", padx=20, pady=2)
+            ctk.CTkLabel(
+                f, text=f"  {n}.  {msg}", font=(theme.FONT, 11), text_color=theme.TEXT,
+                wraplength=490, justify="left", anchor="w",
+            ).pack(anchor="w", padx=12, pady=2)
 
         def code(msg):
-            tk.Label(f, text=msg, bg="#16213e", fg="#e94560",
-                     font=("Courier New", 9), padx=10, pady=4).pack(anchor="w", padx=28, pady=2, fill="x")
+            ctk.CTkLabel(
+                f, text=msg, font=("Courier New", 10), text_color=theme.ACCENT,
+                fg_color=theme.SURFACE, corner_radius=6, anchor="w",
+            ).pack(anchor="w", padx=20, pady=2, fill="x")
 
-        tk.Label(f, text="Como usar o Game Translator", bg="#1a1a2e", fg="#e94560",
-                 font=("Segoe UI", 14, "bold")).pack(pady=(20, 4))
-        tk.Label(f, text="Guia completo de configuração e uso", bg="#1a1a2e",
-                 fg="#aaaaaa", font=("Segoe UI", 9)).pack(pady=(0, 8))
+        ctk.CTkLabel(
+            f, text="Como usar o Nidus",
+            font=(theme.FONT, 16, "bold"), text_color=theme.ACCENT,
+        ).pack(pady=(12, 4))
+        theme.hint_label(f, "Guia completo de configuração e uso").pack(pady=(0, 8))
 
         section("1. Escolha um provedor de IA")
         text("O app precisa de uma API de IA para traduzir. Escolha um dos provedores abaixo:")
@@ -525,77 +800,74 @@ class App(tk.Tk):
         step(2, "Quando o texto mudar, traduz automaticamente")
         step(3, "Clique em Parar quando terminar")
 
-        section("6. Atalhos de teclado")
+        section("6. Atalhos")
         text("Funcionam mesmo com o jogo em foco (rode como administrador):")
         code("F9  →  Abrir seletor de região")
         code("F10 →  Traduzir agora / Iniciar-Parar")
         code("F11 →  Mostrar / ocultar a tradução")
-        text("Para trocar uma tecla: clique no campo do atalho e pressione a nova tecla.")
+        text("Você pode usar teclas do teclado ou botões do mouse (incluindo Mouse 4 e 5).")
+        text("Para trocar um atalho: clique no campo e pressione a tecla ou botão desejado.")
 
         section("7. Overlay (janela de tradução)")
         text("A tradução aparece numa janelinha preta sobre o jogo.")
         step(1, "Arraste pela barra vermelha no topo para mover")
         step(2, "Arraste o canto inferior direito para redimensionar")
-        step(3, "Clique no ✕ para fechar temporariamente")
-        text("")
+        step(3, "Clique no X para fechar temporariamente")
 
-        tk.Button(f, text="Fechar", command=win.destroy,
-                  bg="#e94560", fg="white", relief="flat", cursor="hand2",
-                  font=("Segoe UI", 10)).pack(pady=20)
+        theme.primary_btn(f, "Fechar", win.destroy, height=36).pack(pady=20, padx=12, fill="x")
 
     def _open_donation(self):
-        win = tk.Toplevel(self)
+        win = ctk.CTkToplevel(self)
         win.title("Apoiar o projeto")
-        win.configure(bg="#1a1a2e")
         win.resizable(False, False)
         win.attributes("-topmost", True)
+        win.configure(fg_color=theme.BG)
 
-        tk.Label(win, text="Apoie o Game Translator", bg="#1a1a2e", fg="#e94560",
-                 font=("Segoe UI", 14, "bold")).pack(pady=(20, 4))
-        tk.Label(win, text="Se o app te ajudou, considere contribuir :)", bg="#1a1a2e",
-                 fg="#aaaaaa", font=("Segoe UI", 9)).pack(pady=(0, 12))
+        ctk.CTkLabel(
+            win, text="Apoie o Nidus",
+            font=(theme.FONT, 16, "bold"), text_color=theme.ACCENT,
+        ).pack(pady=(20, 4))
+        theme.hint_label(win, "Se o app te ajudou, considere contribuir :)").pack(pady=(0, 12))
 
-        # QR Code
         try:
             from PIL import ImageTk
             img = Image.open("code.jpeg").resize((220, 220))
             photo = ImageTk.PhotoImage(img)
-            lbl_img = tk.Label(win, image=photo, bg="#1a1a2e")
+            lbl_img = ctk.CTkLabel(win, image=photo, text="")
             lbl_img.image = photo
             lbl_img.pack(pady=(0, 8))
         except Exception:
-            tk.Label(win, text="[QR Code não encontrado]", bg="#1a1a2e", fg="#555").pack()
+            ctk.CTkLabel(win, text="[QR Code não encontrado]", text_color=theme.TEXT_MUTED).pack()
 
-        # Chave Pix
         PIX_KEY = "00020126580014BR.GOV.BCB.PIX01364df31385-39ad-4587-9a8b-72bb281d15905204000053039865802BR5917Jeferson Marciano6009SAO PAULO62140510AATRReYlC6630486CC"
-        tk.Label(win, text="Chave Pix (copia e cola):", bg="#1a1a2e", fg="#eaeaea",
-                 font=("Segoe UI", 9, "bold")).pack()
+        theme.field_label(win, "Chave Pix (copia e cola):").pack()
 
-        frame_pix = tk.Frame(win, bg="#16213e")
+        frame_pix = theme.card(win)
         frame_pix.pack(padx=20, pady=4, fill="x")
-        pix_entry = tk.Entry(frame_pix, font=("Segoe UI", 7), bg="#16213e", fg="#eaeaea",
-                             relief="flat", readonlybackground="#16213e", state="readonly")
-        pix_entry.pack(side="left", fill="x", expand=True, padx=(8, 0), pady=6)
-        pix_entry.config(state="normal")
+        pix_entry = theme.entry(frame_pix, font=(theme.FONT, 8))
+        pix_entry.pack(side="left", fill="x", expand=True, padx=(10, 0), pady=8)
         pix_entry.insert(0, PIX_KEY)
-        pix_entry.config(state="readonly")
+        pix_entry.configure(state="disabled")
 
         def copiar():
             win.clipboard_clear()
             win.clipboard_append(PIX_KEY)
-            btn_copy.config(text="Copiado!")
-            win.after(2000, lambda: btn_copy.config(text="Copiar"))
+            btn_copy.configure(text="Copiado!")
+            win.after(2000, lambda: btn_copy.configure(text="Copiar"))
 
-        btn_copy = tk.Button(frame_pix, text="Copiar", command=copiar,
-                             bg="#e94560", fg="white", relief="flat", cursor="hand2", padx=8)
-        btn_copy.pack(side="right", pady=4, padx=4)
+        btn_copy = theme.primary_btn(frame_pix, "Copiar", copiar, width=80, height=30)
+        btn_copy.pack(side="right", pady=6, padx=8)
 
-        # Link Nubank
         import webbrowser
         NUBANK_URL = "https://nubank.com.br/cobrar/9319j/6a2db4f7-c325-43b6-8f4b-6b919faf887e"
-        tk.Button(win, text="Abrir link do Nubank", fg="#a259ff", bg="#1a1a2e",
-                  relief="flat", cursor="hand2", font=("Segoe UI", 9, "underline"),
-                  command=lambda: webbrowser.open(NUBANK_URL)).pack(pady=(4, 20))
+        ctk.CTkButton(
+            win, text="Abrir link do Nubank",
+            fg_color="transparent", hover_color=theme.SURFACE,
+            text_color="#a259ff", font=(theme.FONT, 11, "underline"),
+            command=lambda: webbrowser.open(NUBANK_URL),
+        ).pack(pady=(4, 20))
+
+    # ── Ações principais ─────────────────────────────────────────────────
 
     def _toggle_overlay(self):
         if not self.overlay:
@@ -609,18 +881,19 @@ class App(tk.Tk):
     def _on_mode_change(self):
         if self.mode_var.get() == "once":
             self.interval_frame.grid_remove()
-            self.btn_start.config(text="▶  Traduzir Agora")
+            self.btn_start.configure(text="Traduzir Agora")
         else:
-            self.interval_frame.grid()
-            self.btn_start.config(text="▶  Iniciar Tradução")
+            self.interval_frame.grid(row=3, column=0, columnspan=2, sticky="w", padx=14, pady=4)
+            self.btn_start.configure(text="Iniciar Tradução")
 
     def _select_region(self):
         self.withdraw()
-        selector = RegionSelector(self)
+        mon = self._selected_monitor()
+        selector = RegionSelector(self, mon)
         self.wait_window(selector)
         if selector.result:
             self.config["region"] = selector.result
-            self.region_label.config(text=self._region_text())
+            self.region_label.configure(text=self._region_text())
         self.deiconify()
 
     def _save(self):
@@ -634,6 +907,10 @@ class App(tk.Tk):
         self.config["hotkey_region"] = self.hotkey_region_var.get()
         self.config["hotkey_translate"] = self.hotkey_translate_var.get()
         self.config["hotkey_toggle"] = self.hotkey_toggle_var.get()
+        try:
+            self.config["monitor_index"] = int(self.monitor_var.get().split()[1]) - 1
+        except Exception:
+            self.config["monitor_index"] = 0
         save_config(self.config)
         self._register_hotkeys()
         self.status_var.set("Configurações salvas!")
@@ -665,12 +942,12 @@ class App(tk.Tk):
         self.capture = ScreenCapture(self.config["region"], self.config["capture_interval"])
 
         if self.mode_var.get() == "once":
-            self.btn_start.config(state="disabled", text="Traduzindo...", bg="#555")
+            self.btn_start.configure(state="disabled", text="Traduzindo...", fg_color=theme.DISABLED)
             self.status_var.set("Traduzindo...")
             self.thread = threading.Thread(target=self._translate_once, daemon=True)
         else:
             self.running = True
-            self.btn_start.config(text="■  Parar", bg="#555")
+            self.btn_start.configure(text="Parar", fg_color=theme.DISABLED)
             self.status_var.set("Rodando...")
             self.thread = threading.Thread(target=self._loop, daemon=True)
 
@@ -678,9 +955,9 @@ class App(tk.Tk):
 
     def _stop(self):
         self.running = False
-        self.btn_start.config(text="▶  Iniciar Tradução", bg="#e94560")
+        self.btn_start.configure(state="normal", fg_color=theme.ACCENT)
         self.status_var.set("Parado")
-        self.after(0, self._on_mode_change)  # restaura label correto do botão
+        self.after(0, self._on_mode_change)
 
     def _translate_once(self):
         try:
@@ -696,8 +973,10 @@ class App(tk.Tk):
         except Exception as e:
             self.after(0, self.status_var.set, f"Erro: {str(e)[:80]}")
         finally:
-            label = "▶  Traduzir Agora" if self.mode_var.get() == "once" else "▶  Iniciar Tradução"
-            self.after(0, lambda: self.btn_start.config(state="normal", text=label, bg="#e94560"))
+            label = "Traduzir Agora" if self.mode_var.get() == "once" else "Iniciar Tradução"
+            self.after(0, lambda: self.btn_start.configure(
+                state="normal", text=label, fg_color=theme.ACCENT,
+            ))
 
     def _loop(self):
         last_translation = ""
@@ -718,8 +997,9 @@ class App(tk.Tk):
 
 
 class RegionSelector(tk.Toplevel):
-    def __init__(self, parent):
+    def __init__(self, parent, monitor: dict):
         super().__init__(parent)
+        self.monitor = monitor
         self.result = None
         self.start_x = self.start_y = 0
         self.rect = None
@@ -727,18 +1007,25 @@ class RegionSelector(tk.Toplevel):
         self.dim_rects = []
         self.info_label = None
 
-        self.attributes("-fullscreen", True)
+        ml, mt = monitor["left"], monitor["top"]
+        mw, mh = monitor["width"], monitor["height"]
+        self.overrideredirect(True)
+        self.geometry(f"{mw}x{mh}+{ml}+{mt}")
         self.attributes("-alpha", 0.55)
-        self.configure(bg="#000010")
+        self.configure(bg=theme.BG)
         self.attributes("-topmost", True)
+        self.lift()
+        self.focus_force()
 
-        self.canvas = tk.Canvas(self, cursor="cross", bg="#000010", highlightthickness=0)
+        self.canvas = tk.Canvas(self, cursor="cross", bg=theme.BG, highlightthickness=0)
         self.canvas.pack(fill="both", expand=True)
 
-        # Instrução no topo
-        self.canvas.create_rectangle(0, 0, 9999, 52, fill="#000000", outline="")
-        self.canvas.create_text(0, 26, text="  Arraste para selecionar a região das legendas   |   ESC para cancelar",
-                                anchor="w", fill="white", font=("Segoe UI", 13))
+        self.canvas.create_rectangle(0, 0, 9999, 52, fill=theme.SURFACE_ALT, outline="")
+        self.canvas.create_text(
+            16, 26,
+            text=f"Monitor {mw}×{mh}  —  Arraste para selecionar a região   |   ESC para cancelar",
+            anchor="w", fill=theme.TEXT, font=(theme.FONT, 13),
+        )
 
         self.canvas.bind("<ButtonPress-1>", self._on_press)
         self.canvas.bind("<B1-Motion>", self._on_drag)
@@ -760,37 +1047,33 @@ class RegionSelector(tk.Toplevel):
         self._clear()
         x1, y1 = self.start_x, self.start_y
         x2, y2 = e.x, e.y
-        sw = self.winfo_screenwidth()
-        sh = self.winfo_screenheight()
+        sw, sh = self.monitor["width"], self.monitor["height"]
 
-        # Escurece fora da seleção
         self.dim_rects = [
-            self.canvas.create_rectangle(0,  0,  sw,  min(y1,y2), fill="#000010", outline=""),
-            self.canvas.create_rectangle(0,  max(y1,y2), sw, sh,  fill="#000010", outline=""),
-            self.canvas.create_rectangle(0,  min(y1,y2), min(x1,x2), max(y1,y2), fill="#000010", outline=""),
-            self.canvas.create_rectangle(max(x1,x2), min(y1,y2), sw, max(y1,y2), fill="#000010", outline=""),
+            self.canvas.create_rectangle(0, 0, sw, min(y1, y2), fill=theme.BG, outline=""),
+            self.canvas.create_rectangle(0, max(y1, y2), sw, sh, fill=theme.BG, outline=""),
+            self.canvas.create_rectangle(0, min(y1, y2), min(x1, x2), max(y1, y2), fill=theme.BG, outline=""),
+            self.canvas.create_rectangle(max(x1, x2), min(y1, y2), sw, max(y1, y2), fill=theme.BG, outline=""),
         ]
-
-        # Área selecionada fica mais clara (quase transparente)
-        self.fill_rect = self.canvas.create_rectangle(x1, y1, x2, y2, fill="#ffffff", outline="", stipple="gray12")
-
-        # Borda vermelha
-        self.rect = self.canvas.create_rectangle(x1, y1, x2, y2, outline="#e94560", width=3)
-
-        # Dimensões
-        w = abs(x2 - x1)
-        h = abs(y2 - y1)
+        self.fill_rect = self.canvas.create_rectangle(
+            x1, y1, x2, y2, fill="#ffffff", outline="", stipple="gray12",
+        )
+        self.rect = self.canvas.create_rectangle(
+            x1, y1, x2, y2, outline=theme.ACCENT, width=3,
+        )
+        w, h = abs(x2 - x1), abs(y2 - y1)
         self.info_label = self.canvas.create_text(
             (x1 + x2) // 2, min(y1, y2) - 10,
             text=f"{w} × {h} px",
-            fill="#e94560", font=("Segoe UI", 11, "bold"), anchor="s"
+            fill=theme.ACCENT, font=(theme.FONT, 11, "bold"), anchor="s",
         )
 
     def _on_release(self, e):
         x1, y1 = min(self.start_x, e.x), min(self.start_y, e.y)
         x2, y2 = max(self.start_x, e.x), max(self.start_y, e.y)
         if x2 - x1 > 20 and y2 - y1 > 10:
-            self.result = {"x1": x1, "y1": y1, "x2": x2, "y2": y2}
+            ml, mt = self.monitor["left"], self.monitor["top"]
+            self.result = {"x1": x1 + ml, "y1": y1 + mt, "x2": x2 + ml, "y2": y2 + mt}
         self.destroy()
 
 

@@ -3,5 +3,7 @@ Pillow
 numpy
 openai
 anthropic
+customtkinter
 keyboard; sys_platform == "win32"
+mouse; sys_platform == "win32"
 pynput; sys_platform == "linux"

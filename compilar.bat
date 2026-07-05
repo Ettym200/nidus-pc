@@ -1,39 +1,42 @@
 @echo off
 chcp 65001 >nul
-title Game Translator - Compilando...
+title Nidus - Compilando...
 
 echo.
 echo  ================================
-echo   Compilando Game Translator
+echo   Compilando Nidus
 echo  ================================
 echo.
 
 pip install pyinstaller >nul 2>&1
 
 echo  Convertendo icone...
-python -c "from PIL import Image; img = Image.open('incone.png'); img.save('incone.ico', format='ICO', sizes=[(256,256),(128,128),(64,64),(32,32),(16,16)])"
+python -c "from PIL import Image; img = Image.open('icon.png'); img.save('icon.ico', format='ICO', sizes=[(256,256),(128,128),(64,64),(32,32),(16,16)])"
 
 echo  Gerando executavel...
 echo.
 
 python -m PyInstaller --noconfirm --onefile --windowed ^
-  --name "GameTranslator" ^
-  --icon "incone.ico" ^
+  --name "Nidus" ^
+  --icon "icon.ico" ^
   --add-data "code.jpeg;." ^
-  --add-data "incone.png;." ^
+  --add-data "icon.png;." ^
   --hidden-import PIL ^
   --hidden-import PIL.ImageTk ^
   --hidden-import mss ^
   --hidden-import openai ^
   --hidden-import anthropic ^
   --hidden-import keyboard ^
+  --hidden-import mouse ^
+  --hidden-import customtkinter ^
+  --collect-all customtkinter ^
   main.py
 
 echo.
-if exist "dist\GameTranslator.exe" (
+if exist "dist\Nidus.exe" (
     echo  ================================
     echo   Sucesso!
-    echo   Arquivo: dist\GameTranslator.exe
+    echo   Arquivo: dist\Nidus.exe
     echo   Esse e o arquivo para distribuir.
     echo  ================================
 ) else (

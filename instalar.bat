@@ -1,11 +1,11 @@
 @echo off
 chcp 65001 >nul
-title Game Translator - Instalador
+title Nidus - Instalador
 cd /d "%~dp0"
 
 echo.
 echo  ================================
-echo   Game Translator - Instalador
+echo   Nidus - Instalador
 echo  ================================
 echo.
 
@@ -72,7 +72,7 @@ echo  Instalando dependencias do app...
 echo.
 
 python -m pip install --upgrade pip --quiet
-python -m pip install mss Pillow numpy openai anthropic keyboard
+python -m pip install mss Pillow numpy openai anthropic customtkinter keyboard mouse
 
 if %errorlevel% neq 0 (
     echo.

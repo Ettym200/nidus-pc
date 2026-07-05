@@ -61,6 +61,24 @@ class Translator:
                 kwargs["base_url"] = base_url
             self._client = OpenAI(**kwargs)
 
+    def translate_text(self, text: str, target_language: str = None) -> str:
+        lang = target_language or self.target_language
+        prompt = f"Traduza o texto a seguir para {lang}. Responda SOMENTE com a tradução, sem explicações:\n\n{text}"
+        if self.provider == "anthropic":
+            response = self._client.messages.create(
+                model=self._get_model(),
+                max_tokens=2000,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            return self._clean(response.content[0].text.strip())
+        else:
+            response = self._client.chat.completions.create(
+                model=self._get_model(),
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=2000,
+            )
+            return self._clean(response.choices[0].message.content.strip())
+
     def translate(self, img: Image.Image) -> str:
         b64 = _img_to_base64(img)
         prompt = PROMPT.format(lang=self.target_language)
