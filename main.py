@@ -58,15 +58,23 @@ from src.speech_to_text import WHISPER_MODELS, COMPUTE_OPTIONS
 
 try:
     from src.audio_capture import list_output_devices
+    from src.audio_sources import (
+        CAPTURE_MODES,
+        is_app_capture_supported,
+        list_audio_applications,
+    )
     AUDIO_AVAILABLE = sys.platform == "win32"
 except ImportError:
     AUDIO_AVAILABLE = False
+    CAPTURE_MODES = []
     list_output_devices = lambda: []
+    list_audio_applications = lambda: []
+    is_app_capture_supported = lambda: False
 from src import ui_theme as theme
 from src.updater import check_update
 
 CONFIG_FILE = os.path.join(APP_DIR, "config.json")
-APP_VERSION = "1.0.3"
+APP_VERSION = "1.0.4"
 RELEASES_URL = "https://github.com/Ettym200/nidus-pc/releases/latest"
 
 DEFAULT_CONFIG = {
@@ -82,6 +90,8 @@ DEFAULT_CONFIG = {
     "hotkey_translate": "f10",
     "skipped_update_version": "",
     "audio_device": "",
+    "audio_capture_mode": "system",
+    "audio_target_pid": 0,
     "whisper_model": "tiny",
     "whisper_compute_device": "cpu",
     "audio_source_language": "auto",
@@ -529,11 +539,55 @@ class App(ctk.CTk):
             row=0, column=0, columnspan=2, sticky="w", padx=14, pady=(12, 8),
         )
 
-        theme.field_label(frame_audio, "Dispositivo:").grid(
+        theme.field_label(frame_audio, "Capturar de:").grid(
             row=1, column=0, sticky="w", padx=14, pady=4,
         )
-        dev_row = ctk.CTkFrame(frame_audio, fg_color="transparent")
-        dev_row.grid(row=1, column=1, sticky="ew", padx=14, pady=4)
+        mode_row = ctk.CTkFrame(frame_audio, fg_color="transparent")
+        mode_row.grid(row=1, column=1, sticky="w", padx=14, pady=4)
+        self.audio_capture_mode_var = tk.StringVar(
+            value=self.config.get("audio_capture_mode", "system"),
+        )
+        for mode_id, mode_label in CAPTURE_MODES:
+            ctk.CTkRadioButton(
+                mode_row, text=mode_label, value=mode_id,
+                variable=self.audio_capture_mode_var,
+                command=self._on_audio_capture_mode_change,
+                font=(theme.FONT, 11), text_color=theme.TEXT,
+                fg_color=theme.ACCENT, hover_color="#c73a52",
+            ).pack(side="left", padx=(0, 12))
+
+        theme.hint_label(
+            frame_audio,
+            "Use 'Aplicativo' para traduzir só o navegador/jogo e ignorar Discord.",
+        ).grid(row=2, column=0, columnspan=2, sticky="w", padx=14, pady=(0, 4))
+
+        self._app_row = ctk.CTkFrame(frame_audio, fg_color="transparent")
+        self._app_row.grid(row=3, column=0, columnspan=2, sticky="ew", padx=14, pady=4)
+        self._app_row.columnconfigure(1, weight=1)
+        theme.field_label(self._app_row, "Aplicativo:").grid(
+            row=0, column=0, sticky="w", pady=4,
+        )
+        app_pick = ctk.CTkFrame(self._app_row, fg_color="transparent")
+        app_pick.grid(row=0, column=1, sticky="ew", pady=4)
+        self.audio_app_var = tk.StringVar(value="")
+        self.audio_app_combo = theme.combo(app_pick, [], variable=self.audio_app_var, width=260)
+        self.audio_app_combo.pack(side="left")
+        theme.secondary_btn(
+            app_pick, "Atualizar", self._refresh_audio_apps, width=90,
+        ).pack(side="left", padx=(8, 0))
+        theme.hint_label(
+            self._app_row,
+            "Abra o app (ex.: Brave, Chrome) e clique Atualizar com áudio tocando.",
+        ).grid(row=1, column=0, columnspan=2, sticky="w", pady=(0, 4))
+
+        self._device_row = ctk.CTkFrame(frame_audio, fg_color="transparent")
+        self._device_row.grid(row=4, column=0, columnspan=2, sticky="ew", padx=14, pady=4)
+        self._device_row.columnconfigure(1, weight=1)
+        theme.field_label(self._device_row, "Dispositivo:").grid(
+            row=0, column=0, sticky="w", pady=4,
+        )
+        dev_row = ctk.CTkFrame(self._device_row, fg_color="transparent")
+        dev_row.grid(row=0, column=1, sticky="ew", pady=4)
         self.audio_device_var = tk.StringVar(value=self.config.get("audio_device", ""))
         self.audio_device_combo = theme.combo(dev_row, [], variable=self.audio_device_var, width=260)
         self.audio_device_combo.pack(side="left")
@@ -543,7 +597,7 @@ class App(ctk.CTk):
         self._refresh_audio_devices()
 
         theme.field_label(frame_audio, "Idioma da fala:").grid(
-            row=2, column=0, sticky="w", padx=14, pady=4,
+            row=5, column=0, sticky="w", padx=14, pady=4,
         )
         self.audio_source_langs = [
             "auto", "Inglês", "Japonês", "Espanhol", "Português", "Francês",
@@ -561,42 +615,42 @@ class App(ctk.CTk):
         self.audio_source_var = tk.StringVar(value=src_display)
         theme.combo(
             frame_audio, self.audio_source_langs, variable=self.audio_source_var, width=220,
-        ).grid(row=2, column=1, sticky="w", padx=14, pady=4)
+        ).grid(row=5, column=1, sticky="w", padx=14, pady=4)
 
         theme.field_label(frame_audio, "Modelo Whisper:").grid(
-            row=3, column=0, sticky="w", padx=14, pady=4,
+            row=6, column=0, sticky="w", padx=14, pady=4,
         )
         self.whisper_model_var = tk.StringVar(value=self.config.get("whisper_model", "base"))
         theme.combo(
             frame_audio, WHISPER_MODELS, variable=self.whisper_model_var, width=220,
-        ).grid(row=3, column=1, sticky="w", padx=14, pady=4)
+        ).grid(row=6, column=1, sticky="w", padx=14, pady=4)
         theme.hint_label(
             frame_audio, "tiny/base = mais rápido | small/medium = mais preciso (baixa na 1ª vez)",
-        ).grid(row=4, column=0, columnspan=2, sticky="w", padx=14, pady=(0, 4))
+        ).grid(row=7, column=0, columnspan=2, sticky="w", padx=14, pady=(0, 4))
 
         theme.field_label(frame_audio, "Processamento:").grid(
-            row=5, column=0, sticky="w", padx=14, pady=4,
+            row=8, column=0, sticky="w", padx=14, pady=4,
         )
         self.whisper_compute_var = tk.StringVar(
             value=self.config.get("whisper_compute_device", "auto"),
         )
         theme.combo(
             frame_audio, COMPUTE_OPTIONS, variable=self.whisper_compute_var, width=220,
-        ).grid(row=5, column=1, sticky="w", padx=14, pady=4)
+        ).grid(row=8, column=1, sticky="w", padx=14, pady=4)
         theme.hint_label(
             frame_audio, "cpu = estável | auto/cuda = GPU NVIDIA (precisa drivers CUDA)",
-        ).grid(row=6, column=0, columnspan=2, sticky="w", padx=14, pady=(0, 4))
+        ).grid(row=9, column=0, columnspan=2, sticky="w", padx=14, pady=(0, 4))
 
         theme.field_label(frame_audio, "Traduzir para:").grid(
-            row=7, column=0, sticky="w", padx=14, pady=4,
+            row=10, column=0, sticky="w", padx=14, pady=4,
         )
         self.audio_lang_var = tk.StringVar(value=self.config.get("target_language", "Português"))
         theme.combo(frame_audio, self.LANGUAGES, variable=self.audio_lang_var, width=220).grid(
-            row=7, column=1, sticky="w", padx=14, pady=4,
+            row=10, column=1, sticky="w", padx=14, pady=4,
         )
 
         stream_row = ctk.CTkFrame(frame_audio, fg_color="transparent")
-        stream_row.grid(row=8, column=0, columnspan=2, sticky="w", padx=14, pady=(4, 14))
+        stream_row.grid(row=11, column=0, columnspan=2, sticky="w", padx=14, pady=(4, 14))
         self.audio_streaming_var = tk.BooleanVar(value=self.config.get("audio_streaming", True))
         ctk.CTkCheckBox(
             stream_row, text="Tradução em streaming (texto aparece aos poucos)",
@@ -627,6 +681,43 @@ class App(ctk.CTk):
             f, "Iniciar tradução por áudio", self._toggle_audio, height=48,
         )
         self.btn_audio_start.pack(fill="x", padx=4, pady=(8, 16))
+
+        self._audio_apps: list[dict] = []
+        self._refresh_audio_apps()
+        self._on_audio_capture_mode_change()
+
+    def _on_audio_capture_mode_change(self):
+        mode = self.audio_capture_mode_var.get()
+        if mode == "application":
+            self._app_row.grid()
+            self._device_row.grid_remove()
+        else:
+            self._app_row.grid_remove()
+            self._device_row.grid()
+
+    def _refresh_audio_apps(self):
+        if not AUDIO_AVAILABLE or not is_app_capture_supported():
+            return
+        self._audio_apps = list_audio_applications()
+        labels = [a["label"] for a in self._audio_apps]
+        if not labels:
+            labels = ["(Nenhum app com áudio — abra o navegador e clique Atualizar)"]
+        self.audio_app_combo.configure(values=labels)
+        saved_pid = self.config.get("audio_target_pid", 0)
+        match = next((a for a in self._audio_apps if a["pid"] == saved_pid), None)
+        if match:
+            self.audio_app_var.set(match["label"])
+        elif self._audio_apps:
+            self.audio_app_var.set(self._audio_apps[0]["label"])
+        else:
+            self.audio_app_var.set(labels[0])
+
+    def _selected_audio_app_pid(self) -> int | None:
+        label = self.audio_app_var.get()
+        for app in self._audio_apps:
+            if app["label"] == label:
+                return app["pid"]
+        return None
 
     def _build_text_tab(self, parent):
         parent.configure(fg_color=theme.BG)
@@ -1224,6 +1315,9 @@ class App(ctk.CTk):
     def _save_audio_config(self):
         device = self.audio_device_var.get()
         self.config["audio_device"] = "" if device == "(Padrão do sistema)" else device
+        self.config["audio_capture_mode"] = self.audio_capture_mode_var.get()
+        pid = self._selected_audio_app_pid()
+        self.config["audio_target_pid"] = pid or 0
         self.config["whisper_model"] = self.whisper_model_var.get()
         self.config["whisper_compute_device"] = self.whisper_compute_var.get()
         self.config["audio_source_language"] = self.audio_source_map.get(
@@ -1255,6 +1349,14 @@ class App(ctk.CTk):
             self.overlay = Overlay()
 
         device = self.config.get("audio_device") or None
+        capture_mode = self.config.get("audio_capture_mode", "system")
+        target_pid = self.config.get("audio_target_pid") or None
+        if capture_mode == "application" and not target_pid:
+            self.audio_status_var.set("Erro: selecione um aplicativo com áudio.")
+            self.btn_audio_start.configure(
+                state="normal", text="Iniciar tradução por áudio", fg_color=theme.ACCENT,
+            )
+            return
         self.btn_audio_start.configure(state="disabled", text="Iniciando...", fg_color=theme.DISABLED)
         self.audio_status_var.set("Carregando...")
 
@@ -1270,6 +1372,8 @@ class App(ctk.CTk):
                 self.audio_pipeline = AudioPipeline(
                     translator=translator,
                     device=device,
+                    capture_mode=capture_mode,
+                    target_pid=target_pid if capture_mode == "application" else None,
                     whisper_model=self.config["whisper_model"],
                     compute_device=self.config.get("whisper_compute_device", "auto"),
                     source_language=self.config["audio_source_language"],

@@ -5,6 +5,7 @@ import threading
 import time
 
 from src.audio_capture import AudioCapture, SAMPLE_RATE
+from src.audio_sources import create_audio_capture
 from src.debug_log import log
 from src.speech_to_text import SpeechToText
 from src.translator import Translator
@@ -16,6 +17,8 @@ class AudioPipeline:
         self,
         translator: Translator,
         device: str | None = None,
+        capture_mode: str = "system",
+        target_pid: int | None = None,
         whisper_model: str = "base",
         compute_device: str = "auto",
         source_language: str = "auto",
@@ -28,6 +31,8 @@ class AudioPipeline:
     ):
         self.translator = translator
         self.device = device
+        self.capture_mode = capture_mode
+        self.target_pid = target_pid
         self.whisper_model = whisper_model
         self.compute_device = compute_device
         self.source_language = source_language
@@ -62,7 +67,11 @@ class AudioPipeline:
         self._vad = VADProcessor(max_speech_duration=6.0)
         self._vad.warmup()
 
-        self._capture = AudioCapture(device=self.device)
+        self._capture = create_audio_capture(
+            mode=self.capture_mode,
+            device=self.device,
+            target_pid=self.target_pid,
+        )
         self._running = True
         self._capture.start()
         self._capture_thread = threading.Thread(target=self._capture_loop, daemon=True)
@@ -70,8 +79,9 @@ class AudioPipeline:
         self._capture_thread.start()
         self._worker_thread.start()
         device_label = self._stt.device.upper()
-        self.on_status(f"Ouvindo áudio ({device_label})...")
-        log(f"Pipeline iniciado ({device_label})")
+        source_label = "APP" if self.capture_mode == "application" else device_label
+        self.on_status(f"Ouvindo áudio ({source_label})...")
+        log(f"Pipeline iniciado ({self.capture_mode}, {source_label})")
 
     def stop(self):
         self._running = False

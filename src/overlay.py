@@ -5,8 +5,15 @@ from src import ui_theme as theme
 
 HANDLE_SIZE = 12
 MAX_LIVE_LINES = 4
-LIVE_LINE_HEIGHT = 34
-LIVE_BASE_HEIGHT = 56
+MIN_WINDOW_HEIGHT = 110
+
+CHROMA = "#010103"
+OVERLAY_ALPHA_FALLBACK = 0.78
+BAR_HEIGHT = 4
+TEXT_PADDING = 14
+TEXT_MARGIN = 8
+OUTLINE_COLOR = "#000000"
+OUTLINE_WIDTH = 2
 
 
 class Overlay:
@@ -16,34 +23,43 @@ class Overlay:
         self._thread.start()
         self._ready.wait()
 
+    def _apply_transparency(self):
+        try:
+            self._root.configure(bg=CHROMA)
+            self._root.attributes("-transparentcolor", CHROMA)
+            self._transparent = True
+        except tk.TclError:
+            self._root.attributes("-alpha", OVERLAY_ALPHA_FALLBACK)
+            self._transparent = False
+
     def _run(self):
         self._root = tk.Tk()
         self._root.overrideredirect(True)
         self._root.attributes("-topmost", True)
-        self._root.attributes("-alpha", 0.92)
-        self._root.configure(bg=theme.SURFACE_ALT)
         self._root.withdraw()
+        self._apply_transparency()
 
         sw = self._root.winfo_screenwidth()
         sh = self._root.winfo_screenheight()
-        self._w, self._h = 700, 110
+        self._screen_h = sh
+        self._w, self._h = 700, MIN_WINDOW_HEIGHT
         self._x = (sw - self._w) // 2
         self._y = sh - 160
         self._root.geometry(f"{self._w}x{self._h}+{self._x}+{self._y}")
 
-        self._frame = tk.Frame(self._root, bg=theme.SURFACE_ALT, cursor="fleur")
+        bg = CHROMA if getattr(self, "_transparent", False) else theme.SURFACE_ALT
+
+        self._frame = tk.Frame(self._root, bg=bg, cursor="fleur")
         self._frame.place(relx=0, rely=0, relwidth=1, relheight=1)
 
-        self._label = tk.Label(
-            self._frame, text="", bg=theme.SURFACE_ALT, fg=theme.TEXT,
-            font=(theme.FONT, 16, "bold"),
-            wraplength=self._w - 24,
-            justify="center",
+        self._canvas = tk.Canvas(
+            self._frame, bg=bg, highlightthickness=0, bd=0,
+            width=self._w, height=max(50, self._h - BAR_HEIGHT),
         )
-        self._label.place(relx=0.5, rely=0.55, anchor="center")
+        self._canvas.place(relx=0, rely=0, relwidth=1, relheight=1, y=BAR_HEIGHT)
 
-        self._bar = tk.Frame(self._frame, bg=theme.ACCENT, height=8, cursor="fleur")
-        self._bar.place(relx=0, rely=0, relwidth=1, height=8)
+        self._bar = tk.Frame(self._frame, bg=theme.ACCENT, height=BAR_HEIGHT, cursor="fleur")
+        self._bar.place(relx=0, rely=0, relwidth=1, height=4)
 
         self._handle = tk.Frame(
             self._root, bg=theme.ACCENT,
@@ -54,12 +70,12 @@ class Overlay:
 
         self._btn_close = tk.Label(
             self._bar, text="×", bg=theme.ACCENT, fg="white",
-            font=(theme.FONT, 10, "bold"), cursor="hand2",
+            font=(theme.FONT, 9, "bold"), cursor="hand2",
         )
-        self._btn_close.place(relx=1.0, rely=0, anchor="ne", x=-6, y=0)
+        self._btn_close.place(relx=1.0, rely=0, anchor="ne", x=-4, y=-1)
         self._btn_close.bind("<Button-1>", lambda e: self._do_hide())
 
-        for w in (self._frame, self._bar, self._label):
+        for w in (self._frame, self._bar, self._canvas):
             w.bind("<ButtonPress-1>", self._drag_start)
             w.bind("<B1-Motion>", self._drag_motion)
 
@@ -74,6 +90,84 @@ class Overlay:
 
         self._ready.set()
         self._root.mainloop()
+
+    def _outline_offsets(self):
+        offsets = []
+        for r in range(1, OUTLINE_WIDTH + 1):
+            for dx in (-r, 0, r):
+                for dy in (-r, 0, r):
+                    if dx == 0 and dy == 0:
+                        continue
+                    offsets.append((dx, dy))
+        return offsets
+
+    def _text_origin(self, justify: str, canvas_h: int):
+        inset = TEXT_PADDING + OUTLINE_WIDTH
+        if justify == "center":
+            return "center", self._w // 2, canvas_h // 2
+        return "nw", inset, inset
+
+    def _measure_text_bbox(self, text: str, font, justify: str, wrap_width: int):
+        if not text:
+            return None
+        canvas_h = max(50, self._h - BAR_HEIGHT)
+        anchor, x, y = self._text_origin(justify, canvas_h)
+        measure = self._canvas.create_text(
+            x, y, text=text, font=font, width=wrap_width,
+            anchor=anchor, justify=justify,
+        )
+        bbox = self._canvas.bbox(measure)
+        self._canvas.delete(measure)
+        return bbox
+
+    def _required_window_height(self, text: str, font, justify: str, wrap_width: int) -> int:
+        bbox = self._measure_text_bbox(text, font, justify, wrap_width)
+        if not bbox:
+            return MIN_WINDOW_HEIGHT
+        text_h = bbox[3] - bbox[1]
+        inset = TEXT_PADDING + OUTLINE_WIDTH
+        canvas_h = text_h + inset * 2 + TEXT_MARGIN * 2
+        total = BAR_HEIGHT + canvas_h
+        max_h = int(self._screen_h * 0.5)
+        return max(MIN_WINDOW_HEIGHT, min(max_h, total))
+
+    def _resize_window(self, height: int):
+        if abs(height - self._h) <= 2:
+            return
+        self._h = height
+        self._root.geometry(f"{self._w}x{self._h}+{self._x}+{self._y}")
+        self._canvas.config(width=self._w, height=max(50, self._h - BAR_HEIGHT))
+
+    def _draw_text(self, text: str, fg: str, font, justify: str, wrap_width: int):
+        self._canvas.delete("all")
+        if not text:
+            return
+
+        needed_h = self._required_window_height(text, font, justify, wrap_width)
+        self._resize_window(needed_h)
+
+        canvas_h = max(50, self._h - BAR_HEIGHT)
+        self._canvas.config(width=self._w, height=canvas_h)
+        anchor, x, y = self._text_origin(justify, canvas_h)
+
+        bbox = self._measure_text_bbox(text, font, justify, wrap_width)
+        pad_x, pad_y = TEXT_MARGIN + OUTLINE_WIDTH, TEXT_MARGIN + OUTLINE_WIDTH
+        if bbox:
+            self._canvas.create_rectangle(
+                bbox[0] - pad_x, bbox[1] - pad_y, bbox[2] + pad_x, bbox[3] + pad_y,
+                fill="black", outline="", stipple="gray50",
+            )
+
+        for dx, dy in self._outline_offsets():
+            self._canvas.create_text(
+                x + dx, y + dy, text=text, fill=OUTLINE_COLOR, font=font,
+                width=wrap_width, anchor=anchor, justify=justify,
+            )
+
+        self._canvas.create_text(
+            x, y, text=text, fill=fg, font=font,
+            width=wrap_width, anchor=anchor, justify=justify,
+        )
 
     def _drag_start(self, e):
         self._drag_ox = e.x_root - self._x
@@ -92,12 +186,11 @@ class Overlay:
 
     def _resize_motion(self, e):
         self._w = max(200, self._resize_w0 + (e.x_root - self._resize_ox))
-        self._h = max(50, self._resize_h0 + (e.y_root - self._resize_oy))
-        self._label.config(wraplength=self._w - 24)
+        self._h = max(MIN_WINDOW_HEIGHT, self._resize_h0 + (e.y_root - self._resize_oy))
+        self._canvas.config(width=self._w, height=max(50, self._h - BAR_HEIGHT))
         self._root.geometry(f"{self._w}x{self._h}+{self._x}+{self._y}")
 
     def show(self, text: str):
-        """Modo jogo: uma linha, substitui o texto."""
         if not text:
             return
         self._root.after(0, self._do_show, text)
@@ -108,7 +201,6 @@ class Overlay:
         self._root.after(0, self._do_show, text)
 
     def show_live(self, text: str, partial: bool = False):
-        """Modo Live: mantém linhas anteriores visíveis."""
         if not text:
             return
         self._root.after(0, self._do_show_live, text, partial)
@@ -119,15 +211,8 @@ class Overlay:
     def _do_show(self, text: str):
         self._live_history = []
         self._live_partial = ""
-        self._label.config(
-            text=text,
-            fg=theme.TEXT,
-            font=(theme.FONT, 16, "bold"),
-            justify="center",
-        )
-        if self._h != 110:
-            self._h = 110
-            self._root.geometry(f"{self._w}x{self._h}+{self._x}+{self._y}")
+        wrap = self._w - 28
+        self._draw_text(text, "#ffffff", (theme.FONT, 16, "bold"), "center", wrap)
         if not self._visible:
             self._root.deiconify()
             self._visible = True
@@ -135,7 +220,7 @@ class Overlay:
     def _do_clear_live(self):
         self._live_history = []
         self._live_partial = ""
-        self._label.config(text="")
+        self._draw_text("", "#ffffff", (theme.FONT, 14, "bold"), "left", self._w - 28)
 
     def _do_show_live(self, text: str, partial: bool):
         if partial:
@@ -154,29 +239,17 @@ class Overlay:
         if not lines:
             return
 
-        # Linhas antigas em tom mais suave, última linha em destaque
         if len(lines) == 1:
             display = lines[0]
-            fg = theme.ACCENT if partial else theme.TEXT
+            fg = theme.ACCENT if partial else "#ffffff"
         else:
             older = lines[:-1]
             current = lines[-1]
             display = "\n".join(f"  {ln}" for ln in older) + f"\n▸ {current}"
-            fg = theme.TEXT
+            fg = "#ffffff"
 
-        self._label.config(
-            text=display,
-            fg=fg,
-            font=(theme.FONT, 14, "bold"),
-            justify="left",
-            wraplength=self._w - 28,
-        )
-
-        line_count = len(lines)
-        new_h = max(110, min(300, LIVE_BASE_HEIGHT + line_count * LIVE_LINE_HEIGHT))
-        if abs(new_h - self._h) > 4:
-            self._h = new_h
-            self._root.geometry(f"{self._w}x{self._h}+{self._x}+{self._y}")
+        wrap = self._w - 28
+        self._draw_text(display, fg, (theme.FONT, 14, "bold"), "left", wrap)
 
         if not self._visible:
             self._root.deiconify()

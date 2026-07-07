@@ -36,7 +36,7 @@ Se quiser, você pode apoiar o projeto voluntariamente (via Pix, dentro do app),
 2. Execute e conceda permissão de administrador quando o Windows pedir
 3. Configure sua API Key e comece a usar
 
-> Baixe sempre pelo link acima. Versão atual: [v1.0.3](https://github.com/Ettym200/nidus-pc/releases/tag/v1.0.3)
+> Baixe sempre pelo link acima. Versão atual: [v1.0.4](https://github.com/Ettym200/nidus-pc/releases/tag/v1.0.4)
 
 ---
 
@@ -105,6 +105,21 @@ Cole a chave no campo **API Key** do app. Você pode salvar várias keys em **Ge
 
 A tradução aparece num overlay flutuante sobre o jogo. Você pode mover, redimensionar e ocultar quando quiser.
 
+### 5. Tradução por áudio (Live)
+
+Na aba **Live**, o Nidus captura o áudio do sistema (ou de um aplicativo específico), transcreve com Whisper e traduz em tempo real — ideal para streams, vídeos e lives.
+
+1. Configure a **API Key** na aba Jogo (mesma usada para tradução por tela)
+2. Na aba **Live**, escolha a fonte de áudio:
+   - **Todo o sistema** — captura tudo que estiver tocando
+   - **Aplicativo específico** — traduz só o navegador/jogo (ex.: Brave) e ignora Discord
+3. Selecione idioma da fala, modelo Whisper (`tiny`/`base` = mais rápido) e idioma de destino
+4. Pressione **F12** (ou o atalho configurado) para iniciar/parar
+
+O overlay mostra até 4 linhas de histórico, com fundo transparente e contorno nas letras para legibilidade em qualquer fundo.
+
+**Modo desenvolvedor:** execute `scripts\iniciar_debug.bat` para ver logs detalhados (`NIDUS_DEBUG=1`).
+
 ---
 
 ## Atalhos
@@ -116,6 +131,7 @@ Os atalhos funcionam mesmo com o jogo em foco (rode como administrador). Você p
 | `F9` | Abrir seletor de região |
 | `F10` | Traduzir agora / Iniciar-Parar |
 | `F11` | Mostrar / ocultar tradução |
+| `F12` | Iniciar / parar tradução por áudio (Live) |
 
 Para trocar um atalho: clique no campo correspondente e pressione a tecla ou botão desejado.
 
@@ -123,7 +139,12 @@ Para trocar um atalho: clique no campo correspondente e pressione a tecla ou bot
 
 ## Funcionalidades
 
-- Tradução em tempo real ou sob demanda
+- Tradução em tempo real ou sob demanda (captura de tela + IA)
+- **Tradução por áudio (Live)** — captura áudio do sistema ou de um app, STT com Whisper, tradução via API
+- Captura por aplicativo (ex.: só o navegador, sem Discord)
+- Overlay transparente com contorno nas letras e redimensionamento automático
+- Histórico de até 4 linhas no modo Live
+- Tradução em streaming (texto aparece aos poucos)
 - Overlay arrastável e redimensionável sobre qualquer jogo
 - Seleção visual da região da tela
 - Suporte a OpenRouter, Groq, OpenAI, Anthropic e APIs customizadas
