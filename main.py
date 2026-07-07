@@ -34,8 +34,14 @@ def _relaunch_as_admin():
 
 APP_DIR = _setup_runtime()
 
-if not _is_admin():
+_DEBUG = os.environ.get("NIDUS_DEBUG") == "1" or "--debug" in sys.argv
+
+if not _is_admin() and not _DEBUG:
     _relaunch_as_admin()
+
+if _DEBUG:
+    print("[Nidus] Modo debug — sem elevação de admin. Atalhos globais podem não funcionar.")
+    print(f"[Nidus] Diretório: {APP_DIR}")
 
 import tkinter as tk
 import threading
@@ -47,6 +53,15 @@ from PIL import Image
 from src.capture import ScreenCapture
 from src.translator import Translator, KNOWN_PROVIDERS
 from src.overlay import Overlay
+from src.audio_pipeline import AudioPipeline
+from src.speech_to_text import WHISPER_MODELS, COMPUTE_OPTIONS
+
+try:
+    from src.audio_capture import list_output_devices
+    AUDIO_AVAILABLE = sys.platform == "win32"
+except ImportError:
+    AUDIO_AVAILABLE = False
+    list_output_devices = lambda: []
 from src import ui_theme as theme
 from src.updater import check_update
 
@@ -66,6 +81,12 @@ DEFAULT_CONFIG = {
     "hotkey_region": "f9",
     "hotkey_translate": "f10",
     "skipped_update_version": "",
+    "audio_device": "",
+    "whisper_model": "tiny",
+    "whisper_compute_device": "cpu",
+    "audio_source_language": "auto",
+    "audio_streaming": True,
+    "hotkey_audio": "f12",
 }
 
 
@@ -167,9 +188,11 @@ class App(ctk.CTk):
 
         self.config = load_config()
         self.running = False
+        self.audio_running = False
         self.overlay = None
         self.capture = None
         self.translator = None
+        self.audio_pipeline = None
 
         self._build_ui()
         self._register_hotkeys()
@@ -247,9 +270,11 @@ class App(ctk.CTk):
         self.tabs.pack(fill="both", expand=True, padx=12, pady=12)
 
         tab_game = self.tabs.add("Jogo")
+        tab_live = self.tabs.add("Live")
         tab_text = self.tabs.add("Traduzir Texto")
 
         self._build_game_tab(tab_game)
+        self._build_live_tab(tab_live)
         self._build_text_tab(tab_text)
 
     def _build_game_tab(self, parent):
@@ -431,10 +456,16 @@ class App(ctk.CTk):
         self.hotkey_toggle_var = tk.StringVar(value=self.config.get("hotkey_toggle", "f11"))
         self._make_hotkey_entry(frame_hotkey, self.hotkey_toggle_var, row=3)
 
+        theme.field_label(frame_hotkey, "Tradução por áudio (Live):").grid(
+            row=4, column=0, sticky="w", padx=14, pady=4,
+        )
+        self.hotkey_audio_var = tk.StringVar(value=self.config.get("hotkey_audio", "f12"))
+        self._make_hotkey_entry(frame_hotkey, self.hotkey_audio_var, row=4)
+
         theme.hint_label(
             frame_hotkey,
             "(clique no campo e pressione uma tecla ou botão do mouse)",
-        ).grid(row=4, column=0, columnspan=2, sticky="w", padx=14, pady=(0, 14))
+        ).grid(row=5, column=0, columnspan=2, sticky="w", padx=14, pady=(0, 14))
 
         # ── Status e ações ───────────────────────────────────────────────
         self.status_var = tk.StringVar(value="Parado")
@@ -458,6 +489,144 @@ class App(ctk.CTk):
         theme.success_btn(f, "Apoiar via Pix", self._open_donation).pack(
             fill="x", padx=4, pady=(0, 16),
         )
+
+    def _build_live_tab(self, parent):
+        parent.configure(fg_color=theme.BG)
+        scroll = ctk.CTkScrollableFrame(parent, fg_color=theme.BG, corner_radius=0)
+        scroll.pack(fill="both", expand=True)
+        f = scroll
+        pad = {"padx": 4, "pady": 6}
+
+        ctk.CTkLabel(
+            f, text="Tradução por áudio",
+            font=(theme.FONT, 18, "bold"), text_color=theme.ACCENT,
+        ).pack(pady=(12, 4))
+        ctk.CTkLabel(
+            f,
+            text="Captura o áudio do sistema (lives, vídeos, chamadas) e exibe legendas traduzidas.",
+            font=(theme.FONT, 11), text_color=theme.TEXT_MUTED, wraplength=460,
+        ).pack(pady=(0, 8))
+
+        if not AUDIO_AVAILABLE:
+            ctk.CTkLabel(
+                f,
+                text="Disponível apenas no Windows com PyAudioWPatch instalado.",
+                font=(theme.FONT, 11), text_color=theme.ACCENT, wraplength=460,
+            ).pack(padx=16, pady=16)
+            self.audio_status_var = tk.StringVar(value="Indisponível")
+            self.audio_original_var = tk.StringVar(value="")
+            self.audio_translation_var = tk.StringVar(value="")
+            return
+
+        theme.hint_label(
+            f, "Configure a API Key na aba Jogo antes de iniciar.",
+        ).pack(pady=(0, 8))
+
+        frame_audio = theme.card(f)
+        frame_audio.pack(fill="x", **pad)
+        frame_audio.columnconfigure(1, weight=1)
+        theme.section_title(frame_audio, "Áudio do sistema").grid(
+            row=0, column=0, columnspan=2, sticky="w", padx=14, pady=(12, 8),
+        )
+
+        theme.field_label(frame_audio, "Dispositivo:").grid(
+            row=1, column=0, sticky="w", padx=14, pady=4,
+        )
+        dev_row = ctk.CTkFrame(frame_audio, fg_color="transparent")
+        dev_row.grid(row=1, column=1, sticky="ew", padx=14, pady=4)
+        self.audio_device_var = tk.StringVar(value=self.config.get("audio_device", ""))
+        self.audio_device_combo = theme.combo(dev_row, [], variable=self.audio_device_var, width=260)
+        self.audio_device_combo.pack(side="left")
+        theme.secondary_btn(dev_row, "Atualizar", self._refresh_audio_devices, width=90).pack(
+            side="left", padx=(8, 0),
+        )
+        self._refresh_audio_devices()
+
+        theme.field_label(frame_audio, "Idioma da fala:").grid(
+            row=2, column=0, sticky="w", padx=14, pady=4,
+        )
+        self.audio_source_langs = [
+            "auto", "Inglês", "Japonês", "Espanhol", "Português", "Francês",
+            "Alemão", "Coreano", "Chinês", "Russo",
+        ]
+        self.audio_source_map = {
+            "auto": "auto",
+            "Inglês": "en", "Japonês": "ja", "Espanhol": "es", "Português": "pt",
+            "Francês": "fr", "Alemão": "de", "Coreano": "ko", "Chinês": "zh", "Russo": "ru",
+        }
+        saved_src = self.config.get("audio_source_language", "auto")
+        src_display = next(
+            (k for k, v in self.audio_source_map.items() if v == saved_src), "auto",
+        )
+        self.audio_source_var = tk.StringVar(value=src_display)
+        theme.combo(
+            frame_audio, self.audio_source_langs, variable=self.audio_source_var, width=220,
+        ).grid(row=2, column=1, sticky="w", padx=14, pady=4)
+
+        theme.field_label(frame_audio, "Modelo Whisper:").grid(
+            row=3, column=0, sticky="w", padx=14, pady=4,
+        )
+        self.whisper_model_var = tk.StringVar(value=self.config.get("whisper_model", "base"))
+        theme.combo(
+            frame_audio, WHISPER_MODELS, variable=self.whisper_model_var, width=220,
+        ).grid(row=3, column=1, sticky="w", padx=14, pady=4)
+        theme.hint_label(
+            frame_audio, "tiny/base = mais rápido | small/medium = mais preciso (baixa na 1ª vez)",
+        ).grid(row=4, column=0, columnspan=2, sticky="w", padx=14, pady=(0, 4))
+
+        theme.field_label(frame_audio, "Processamento:").grid(
+            row=5, column=0, sticky="w", padx=14, pady=4,
+        )
+        self.whisper_compute_var = tk.StringVar(
+            value=self.config.get("whisper_compute_device", "auto"),
+        )
+        theme.combo(
+            frame_audio, COMPUTE_OPTIONS, variable=self.whisper_compute_var, width=220,
+        ).grid(row=5, column=1, sticky="w", padx=14, pady=4)
+        theme.hint_label(
+            frame_audio, "cpu = estável | auto/cuda = GPU NVIDIA (precisa drivers CUDA)",
+        ).grid(row=6, column=0, columnspan=2, sticky="w", padx=14, pady=(0, 4))
+
+        theme.field_label(frame_audio, "Traduzir para:").grid(
+            row=7, column=0, sticky="w", padx=14, pady=4,
+        )
+        self.audio_lang_var = tk.StringVar(value=self.config.get("target_language", "Português"))
+        theme.combo(frame_audio, self.LANGUAGES, variable=self.audio_lang_var, width=220).grid(
+            row=7, column=1, sticky="w", padx=14, pady=4,
+        )
+
+        stream_row = ctk.CTkFrame(frame_audio, fg_color="transparent")
+        stream_row.grid(row=8, column=0, columnspan=2, sticky="w", padx=14, pady=(4, 14))
+        self.audio_streaming_var = tk.BooleanVar(value=self.config.get("audio_streaming", True))
+        ctk.CTkCheckBox(
+            stream_row, text="Tradução em streaming (texto aparece aos poucos)",
+            variable=self.audio_streaming_var,
+            font=(theme.FONT, 11), text_color=theme.TEXT,
+            fg_color=theme.ACCENT, hover_color="#c73a52",
+        ).pack(side="left")
+
+        self.audio_status_var = tk.StringVar(value="Parado")
+        ctk.CTkLabel(
+            f, textvariable=self.audio_status_var,
+            font=(theme.FONT, 11), text_color=theme.TEXT_DIM,
+        ).pack(pady=(8, 0))
+
+        self.audio_original_var = tk.StringVar(value="")
+        ctk.CTkLabel(
+            f, textvariable=self.audio_original_var,
+            font=(theme.FONT, 10), text_color=theme.TEXT_MUTED, wraplength=460, justify="left",
+        ).pack(pady=(2, 0))
+
+        self.audio_translation_var = tk.StringVar(value="")
+        ctk.CTkLabel(
+            f, textvariable=self.audio_translation_var,
+            font=(theme.FONT, 11, "italic"), text_color=theme.ACCENT, wraplength=460, justify="left",
+        ).pack(pady=(2, 8))
+
+        self.btn_audio_start = theme.primary_btn(
+            f, "Iniciar tradução por áudio", self._toggle_audio, height=48,
+        )
+        self.btn_audio_start.pack(fill="x", padx=4, pady=(8, 16))
 
     def _build_text_tab(self, parent):
         parent.configure(fg_color=theme.BG)
@@ -697,6 +866,7 @@ class App(ctk.CTk):
         self._register_hotkey(self.hotkey_region_var.get(), self._select_region)
         self._register_hotkey(self.hotkey_translate_var.get(), self._toggle)
         self._register_hotkey(self.hotkey_toggle_var.get(), self._toggle_overlay)
+        self._register_hotkey(self.hotkey_audio_var.get(), self._toggle_audio)
 
     # ── Pop-ups ──────────────────────────────────────────────────────────
 
@@ -926,6 +1096,7 @@ class App(ctk.CTk):
         code("F9  →  Abrir seletor de região")
         code("F10 →  Traduzir agora / Iniciar-Parar")
         code("F11 →  Mostrar / ocultar a tradução")
+        code("F12 →  Iniciar / parar tradução por áudio (Live)")
         text("Você pode usar teclas do teclado ou botões do mouse (incluindo Mouse 4 e 5).")
         text("Para trocar um atalho: clique no campo e pressione a tecla ou botão desejado.")
 
@@ -1028,6 +1199,7 @@ class App(ctk.CTk):
         self.config["hotkey_region"] = self.hotkey_region_var.get()
         self.config["hotkey_translate"] = self.hotkey_translate_var.get()
         self.config["hotkey_toggle"] = self.hotkey_toggle_var.get()
+        self.config["hotkey_audio"] = self.hotkey_audio_var.get()
         try:
             self.config["monitor_index"] = int(self.monitor_var.get().split()[1]) - 1
         except Exception:
@@ -1036,6 +1208,117 @@ class App(ctk.CTk):
         self._register_hotkeys()
         self.status_var.set("Configurações salvas!")
 
+    def _refresh_audio_devices(self):
+        if not AUDIO_AVAILABLE:
+            return
+        devices = ["(Padrão do sistema)"] + list_output_devices()
+        self.audio_device_combo.configure(values=devices)
+        current = self.config.get("audio_device", "")
+        if not current:
+            self.audio_device_var.set("(Padrão do sistema)")
+        elif current in devices:
+            self.audio_device_var.set(current)
+        elif devices:
+            self.audio_device_var.set(devices[0])
+
+    def _save_audio_config(self):
+        device = self.audio_device_var.get()
+        self.config["audio_device"] = "" if device == "(Padrão do sistema)" else device
+        self.config["whisper_model"] = self.whisper_model_var.get()
+        self.config["whisper_compute_device"] = self.whisper_compute_var.get()
+        self.config["audio_source_language"] = self.audio_source_map.get(
+            self.audio_source_var.get(), "auto",
+        )
+        self.config["audio_streaming"] = self.audio_streaming_var.get()
+        self.config["target_language"] = self.audio_lang_var.get()
+        save_config(self.config)
+
+    def _toggle_audio(self):
+        if self.audio_running:
+            self._stop_audio()
+        else:
+            self._start_audio()
+
+    def _start_audio(self):
+        if not AUDIO_AVAILABLE:
+            self.audio_status_var.set("Recurso disponível apenas no Windows.")
+            return
+        if self.running:
+            self._stop()
+        self._save_audio_config()
+        api_key = self.api_key_var.get().strip() or self.config.get("api_key", "")
+        if not api_key:
+            self.audio_status_var.set("Erro: configure a API Key na aba Jogo.")
+            return
+
+        if not self.overlay:
+            self.overlay = Overlay()
+
+        device = self.config.get("audio_device") or None
+        self.btn_audio_start.configure(state="disabled", text="Iniciando...", fg_color=theme.DISABLED)
+        self.audio_status_var.set("Carregando...")
+
+        def _run():
+            try:
+                translator = Translator(
+                    api_key=api_key,
+                    provider=self.provider_var.get(),
+                    target_language=self.audio_lang_var.get(),
+                    custom_base_url=self.base_url_var.get(),
+                    model=self.model_var.get(),
+                )
+                self.audio_pipeline = AudioPipeline(
+                    translator=translator,
+                    device=device,
+                    whisper_model=self.config["whisper_model"],
+                    compute_device=self.config.get("whisper_compute_device", "auto"),
+                    source_language=self.config["audio_source_language"],
+                    streaming=self.config.get("audio_streaming", True),
+                    on_status=lambda msg: self.after(0, self.audio_status_var.set, msg),
+                    on_original=lambda text: self.after(
+                        0, self.audio_original_var.set, f'Ouvido: "{text[:100]}"',
+                    ),
+                    on_translation=lambda text: self._on_audio_translation(text),
+                    on_translation_partial=lambda text: self._on_audio_translation_partial(text),
+                    on_error=lambda err: self.after(0, self.audio_status_var.set, f"Erro: {err[:80]}"),
+                )
+                self.audio_pipeline.start()
+                self.audio_running = True
+                self.after(0, lambda: self.btn_audio_start.configure(
+                    state="normal", text="Parar tradução por áudio", fg_color=theme.DISABLED,
+                ))
+            except Exception as e:
+                self.after(0, lambda: self.audio_status_var.set(f"Erro: {str(e)[:80]}"))
+                self.after(0, lambda: self.btn_audio_start.configure(
+                    state="normal", text="Iniciar tradução por áudio", fg_color=theme.ACCENT,
+                ))
+
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _on_audio_translation(self, text: str):
+        preview = f'"{text[:80]}..."' if len(text) > 80 else f'"{text}"'
+        self.audio_translation_var.set(preview)
+        if self.overlay:
+            self.overlay.show_live(text, partial=False)
+
+    def _on_audio_translation_partial(self, text: str):
+        preview = f'"{text[:80]}..."' if len(text) > 80 else f'"{text}"'
+        self.audio_translation_var.set(preview)
+        if self.overlay:
+            self.overlay.show_live(text, partial=True)
+
+    def _stop_audio(self):
+        self.audio_running = False
+        if self.audio_pipeline:
+            self.audio_pipeline.stop()
+            self.audio_pipeline = None
+        if self.overlay:
+            self.overlay.clear_live()
+        self.btn_audio_start.configure(
+            state="normal", text="Iniciar tradução por áudio", fg_color=theme.ACCENT,
+        )
+        self.audio_status_var.set("Parado")
+
     def _toggle(self):
         if self.running:
             self._stop()
@@ -1043,6 +1326,8 @@ class App(ctk.CTk):
             self._start()
 
     def _start(self):
+        if self.audio_running:
+            self._stop_audio()
         self._save()
         if not self.config["api_key"]:
             self.status_var.set("Erro: informe a API Key!")
@@ -1200,13 +1485,20 @@ class RegionSelector(tk.Toplevel):
 
 if __name__ == "__main__":
     try:
+        if _DEBUG:
+            print("[Nidus] Iniciando interface...")
         app = App()
+        if _DEBUG:
+            print("[Nidus] App pronto. Feche a janela ou Ctrl+C aqui para encerrar.")
         app.mainloop()
     except Exception:
         import traceback
         log_path = os.path.join(APP_DIR, "nidus_error.log")
         with open(log_path, "w", encoding="utf-8") as f:
             traceback.print_exc(file=f)
+        if _DEBUG:
+            print(f"\n[Nidus] ERRO — detalhes também em:\n{log_path}\n")
+            traceback.print_exc()
         if getattr(sys, "frozen", False):
             ctypes.windll.user32.MessageBoxW(
                 0,

@@ -72,7 +72,7 @@ echo  Instalando dependencias do app...
 echo.
 
 python -m pip install --upgrade pip --quiet
-python -m pip install mss Pillow numpy openai anthropic customtkinter keyboard mouse
+python -m pip install mss Pillow numpy openai anthropic customtkinter keyboard mouse PyAudioWPatch faster-whisper silero-vad
 
 if %errorlevel% neq 0 (
     echo.

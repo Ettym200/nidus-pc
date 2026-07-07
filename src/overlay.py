@@ -4,6 +4,9 @@ import threading
 from src import ui_theme as theme
 
 HANDLE_SIZE = 12
+MAX_LIVE_LINES = 4
+LIVE_LINE_HEIGHT = 34
+LIVE_BASE_HEIGHT = 56
 
 
 class Overlay:
@@ -37,7 +40,7 @@ class Overlay:
             wraplength=self._w - 24,
             justify="center",
         )
-        self._label.place(relx=0.5, rely=0.52, anchor="center")
+        self._label.place(relx=0.5, rely=0.55, anchor="center")
 
         self._bar = tk.Frame(self._frame, bg=theme.ACCENT, height=8, cursor="fleur")
         self._bar.place(relx=0, rely=0, relwidth=1, height=8)
@@ -66,6 +69,8 @@ class Overlay:
         self._drag_ox = self._drag_oy = 0
         self._resize_ox = self._resize_oy = 0
         self._visible = False
+        self._live_history: list[str] = []
+        self._live_partial = ""
 
         self._ready.set()
         self._root.mainloop()
@@ -92,12 +97,87 @@ class Overlay:
         self._root.geometry(f"{self._w}x{self._h}+{self._x}+{self._y}")
 
     def show(self, text: str):
+        """Modo jogo: uma linha, substitui o texto."""
         if not text:
             return
         self._root.after(0, self._do_show, text)
 
+    def show_partial(self, text: str):
+        if not text:
+            return
+        self._root.after(0, self._do_show, text)
+
+    def show_live(self, text: str, partial: bool = False):
+        """Modo Live: mantém linhas anteriores visíveis."""
+        if not text:
+            return
+        self._root.after(0, self._do_show_live, text, partial)
+
+    def clear_live(self):
+        self._root.after(0, self._do_clear_live)
+
     def _do_show(self, text: str):
-        self._label.config(text=text)
+        self._live_history = []
+        self._live_partial = ""
+        self._label.config(
+            text=text,
+            fg=theme.TEXT,
+            font=(theme.FONT, 16, "bold"),
+            justify="center",
+        )
+        if self._h != 110:
+            self._h = 110
+            self._root.geometry(f"{self._w}x{self._h}+{self._x}+{self._y}")
+        if not self._visible:
+            self._root.deiconify()
+            self._visible = True
+
+    def _do_clear_live(self):
+        self._live_history = []
+        self._live_partial = ""
+        self._label.config(text="")
+
+    def _do_show_live(self, text: str, partial: bool):
+        if partial:
+            self._live_partial = text
+        else:
+            self._live_partial = ""
+            if text and (not self._live_history or self._live_history[-1] != text):
+                self._live_history.append(text)
+                if len(self._live_history) > MAX_LIVE_LINES:
+                    self._live_history = self._live_history[-MAX_LIVE_LINES:]
+
+        lines = list(self._live_history)
+        if self._live_partial:
+            lines.append(self._live_partial)
+
+        if not lines:
+            return
+
+        # Linhas antigas em tom mais suave, última linha em destaque
+        if len(lines) == 1:
+            display = lines[0]
+            fg = theme.ACCENT if partial else theme.TEXT
+        else:
+            older = lines[:-1]
+            current = lines[-1]
+            display = "\n".join(f"  {ln}" for ln in older) + f"\n▸ {current}"
+            fg = theme.TEXT
+
+        self._label.config(
+            text=display,
+            fg=fg,
+            font=(theme.FONT, 14, "bold"),
+            justify="left",
+            wraplength=self._w - 28,
+        )
+
+        line_count = len(lines)
+        new_h = max(110, min(300, LIVE_BASE_HEIGHT + line_count * LIVE_LINE_HEIGHT))
+        if abs(new_h - self._h) > 4:
+            self._h = new_h
+            self._root.geometry(f"{self._w}x{self._h}+{self._x}+{self._y}")
+
         if not self._visible:
             self._root.deiconify()
             self._visible = True

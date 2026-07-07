@@ -7,3 +7,6 @@ customtkinter
 keyboard; sys_platform == "win32"
 mouse; sys_platform == "win32"
 pynput; sys_platform == "linux"
+PyAudioWPatch; sys_platform == "win32"
+faster-whisper
+silero-vad; sys_platform == "win32"

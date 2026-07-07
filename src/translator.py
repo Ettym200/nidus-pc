@@ -2,6 +2,8 @@ import base64
 import io
 from PIL import Image
 
+from src.debug_log import log
+
 
 def _img_to_base64(img: Image.Image) -> str:
     buf = io.BytesIO()
@@ -78,6 +80,50 @@ class Translator:
                 max_tokens=2000,
             )
             return self._clean(response.choices[0].message.content.strip())
+
+    def translate_text_stream(
+        self,
+        text: str,
+        target_language: str = None,
+        on_delta=None,
+    ) -> str:
+        """Traduz com streaming; chama on_delta a cada pedaço de texto."""
+        lang = target_language or self.target_language
+        log(f"API tradução ({self.provider}) → {lang}")
+        prompt = (
+            f"Traduza o texto a seguir para {lang}. "
+            f"Responda SOMENTE com a tradução, sem explicações:\n\n{text}"
+        )
+        parts: list[str] = []
+
+        def _emit(delta: str):
+            if not delta:
+                return
+            parts.append(delta)
+            if on_delta:
+                on_delta("".join(parts))
+
+        if self.provider == "anthropic":
+            with self._client.messages.stream(
+                model=self._get_model(),
+                max_tokens=2000,
+                messages=[{"role": "user", "content": prompt}],
+            ) as stream:
+                for event in stream.text_stream:
+                    _emit(event)
+            return self._clean("".join(parts))
+
+        response = self._client.chat.completions.create(
+            model=self._get_model(),
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=2000,
+            stream=True,
+        )
+        for chunk in response:
+            delta = chunk.choices[0].delta.content
+            if delta:
+                _emit(delta)
+        return self._clean("".join(parts))
 
     def translate(self, img: Image.Image) -> str:
         b64 = _img_to_base64(img)
