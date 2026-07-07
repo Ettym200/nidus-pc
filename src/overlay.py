@@ -2,6 +2,7 @@ import tkinter as tk
 import threading
 
 from src import ui_theme as theme
+from src.text_sanitize import sanitize_display_text
 
 HANDLE_SIZE = 12
 MAX_LIVE_LINES = 4
@@ -223,6 +224,9 @@ class Overlay:
         self._draw_text("", "#ffffff", (theme.FONT, 14, "bold"), "left", self._w - 28)
 
     def _do_show_live(self, text: str, partial: bool):
+        text = sanitize_display_text(text, max_len=200)
+        if not text:
+            return
         if partial:
             self._live_partial = text
         else:

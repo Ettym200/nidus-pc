@@ -45,6 +45,7 @@ if _DEBUG:
 
 import tkinter as tk
 import threading
+import queue
 import json
 import keyboard
 import mouse
@@ -74,7 +75,7 @@ from src import ui_theme as theme
 from src.updater import check_update
 
 CONFIG_FILE = os.path.join(APP_DIR, "config.json")
-APP_VERSION = "1.0.4"
+APP_VERSION = "1.0.5"
 RELEASES_URL = "https://github.com/Ettym200/nidus-pc/releases/latest"
 
 DEFAULT_CONFIG = {
@@ -97,6 +98,13 @@ DEFAULT_CONFIG = {
     "audio_source_language": "auto",
     "audio_streaming": True,
     "hotkey_audio": "f12",
+    "interview_context": "",
+    "interview_type": "Geral",
+    "interview_answer_language": "Português",
+    "interview_streaming": True,
+    "interview_capture_mode": "system",
+    "interview_target_pid": 0,
+    "interview_audio_device": "",
 }
 
 
@@ -185,13 +193,22 @@ class App(ctk.CTk):
         "Hebraico", "Tailandês", "Vietnamita", "Indonésio", "Malaio",
         "Romeno", "Húngaro", "Tcheco", "Eslovaco", "Croata", "Ucraniano",
     ]
+    AUDIO_SOURCE_LANGS = [
+        "auto", "Inglês", "Japonês", "Espanhol", "Português", "Francês",
+        "Alemão", "Coreano", "Chinês", "Russo",
+    ]
+    AUDIO_SOURCE_MAP = {
+        "auto": "auto",
+        "Inglês": "en", "Japonês": "ja", "Espanhol": "es", "Português": "pt",
+        "Francês": "fr", "Alemão": "de", "Coreano": "ko", "Chinês": "zh", "Russo": "ru",
+    }
 
     def __init__(self):
         theme.setup_theme()
         super().__init__()
         self.title("Nidus")
-        self.geometry("540x720")
-        self.minsize(540, 600)
+        self.geometry("920x720")
+        self.minsize(880, 620)
         self.configure(fg_color=theme.BG)
         _set_window_icon(self)
         self.after(200, lambda: _set_window_icon(self))
@@ -199,15 +216,45 @@ class App(ctk.CTk):
         self.config = load_config()
         self.running = False
         self.audio_running = False
+        self.interview_running = False
         self.overlay = None
         self.capture = None
         self.translator = None
         self.audio_pipeline = None
+        self.interview_pipeline = None
+        self._ui_queue: queue.Queue = queue.Queue()
+        self._interview_answer_cache = ""
 
         self._build_ui()
+        self._poll_ui_queue()
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
         self._register_hotkeys()
         self._on_mode_change()
         self.after(1500, self._check_updates_async)
+
+    def _poll_ui_queue(self):
+        while True:
+            try:
+                fn, args, kwargs = self._ui_queue.get_nowait()
+                fn(*args, **kwargs)
+            except queue.Empty:
+                break
+            except Exception as exc:
+                from src.debug_log import log
+                log(f"Erro na UI: {exc}")
+        self.after(30, self._poll_ui_queue)
+
+    def _ui(self, fn, *args, **kwargs):
+        self._ui_queue.put((fn, args, kwargs))
+
+    def _on_close(self):
+        try:
+            if self.audio_running:
+                self._stop_audio()
+            if self.interview_running:
+                self._stop_interview()
+        finally:
+            self.destroy()
 
     def _check_updates_async(self):
         def _run():
@@ -281,16 +328,21 @@ class App(ctk.CTk):
 
         tab_game = self.tabs.add("Jogo")
         tab_live = self.tabs.add("Live")
+        tab_interview = self.tabs.add("Entrevista")
         tab_text = self.tabs.add("Traduzir Texto")
 
         self._build_game_tab(tab_game)
         self._build_live_tab(tab_live)
+        self._build_interview_tab(tab_interview)
         self._build_text_tab(tab_text)
 
     def _build_game_tab(self, parent):
         parent.configure(fg_color=theme.BG)
+        parent.columnconfigure(0, weight=1)
+        parent.rowconfigure(0, weight=1)
+
         scroll = ctk.CTkScrollableFrame(parent, fg_color=theme.BG, corner_radius=0)
-        scroll.pack(fill="both", expand=True)
+        scroll.grid(row=0, column=0, sticky="nsew")
         f = scroll
         pad = {"padx": 4, "pady": 6}
 
@@ -477,28 +529,41 @@ class App(ctk.CTk):
             "(clique no campo e pressione uma tecla ou botão do mouse)",
         ).grid(row=5, column=0, columnspan=2, sticky="w", padx=14, pady=(0, 14))
 
-        # ── Status e ações ───────────────────────────────────────────────
+        actions = ctk.CTkFrame(parent, fg_color=theme.SURFACE, corner_radius=theme.CORNER)
+        actions.grid(row=1, column=0, sticky="ew", padx=8, pady=(0, 8))
+        actions.columnconfigure(0, weight=1)
+
+        status_row = ctk.CTkFrame(actions, fg_color="transparent")
+        status_row.grid(row=0, column=0, sticky="ew", padx=12, pady=(10, 2))
         self.status_var = tk.StringVar(value="Parado")
         ctk.CTkLabel(
-            f, textvariable=self.status_var,
+            status_row, textvariable=self.status_var,
             font=(theme.FONT, 11), text_color=theme.TEXT_DIM,
-        ).pack(pady=(8, 0))
-
+        ).pack(side="left")
         self.last_text_var = tk.StringVar(value="")
         ctk.CTkLabel(
-            f, textvariable=self.last_text_var,
-            font=(theme.FONT, 11, "italic"), text_color=theme.ACCENT,
-            wraplength=460, justify="left",
-        ).pack(pady=(2, 8))
+            status_row, textvariable=self.last_text_var,
+            font=(theme.FONT, 10, "italic"), text_color=theme.ACCENT,
+            wraplength=520, justify="right",
+        ).pack(side="right", fill="x", expand=True, padx=(12, 0))
 
-        self.btn_start = theme.primary_btn(f, "Iniciar Tradução", self._toggle, height=48)
-        self.btn_start.pack(fill="x", padx=4, pady=(8, 4))
-
-        theme.secondary_btn(f, "Salvar configurações", self._save).pack(fill="x", padx=4, pady=4)
-        theme.secondary_btn(f, "Como usar", self._open_help).pack(fill="x", padx=4, pady=4)
-        theme.success_btn(f, "Apoiar via Pix", self._open_donation).pack(
-            fill="x", padx=4, pady=(0, 16),
+        self.btn_start = theme.primary_btn(
+            actions, "Iniciar Tradução", self._toggle, height=44,
         )
+        self.btn_start.grid(row=1, column=0, sticky="ew", padx=12, pady=(6, 8))
+
+        btn_row = ctk.CTkFrame(actions, fg_color="transparent")
+        btn_row.grid(row=2, column=0, sticky="ew", padx=12, pady=(0, 10))
+        btn_row.columnconfigure((0, 1, 2), weight=1)
+        theme.secondary_btn(
+            btn_row, "Salvar", self._save, height=34, font=(theme.FONT, 10),
+        ).grid(row=0, column=0, sticky="ew", padx=(0, 4))
+        theme.secondary_btn(
+            btn_row, "Como usar", self._open_help, height=34, font=(theme.FONT, 10),
+        ).grid(row=0, column=1, sticky="ew", padx=4)
+        theme.success_btn(
+            btn_row, "Apoiar Pix", self._open_donation, height=34, font=(theme.FONT, 10),
+        ).grid(row=0, column=2, sticky="ew", padx=(4, 0))
 
     def _build_live_tab(self, parent):
         parent.configure(fg_color=theme.BG)
@@ -599,15 +664,8 @@ class App(ctk.CTk):
         theme.field_label(frame_audio, "Idioma da fala:").grid(
             row=5, column=0, sticky="w", padx=14, pady=4,
         )
-        self.audio_source_langs = [
-            "auto", "Inglês", "Japonês", "Espanhol", "Português", "Francês",
-            "Alemão", "Coreano", "Chinês", "Russo",
-        ]
-        self.audio_source_map = {
-            "auto": "auto",
-            "Inglês": "en", "Japonês": "ja", "Espanhol": "es", "Português": "pt",
-            "Francês": "fr", "Alemão": "de", "Coreano": "ko", "Chinês": "zh", "Russo": "ru",
-        }
+        self.audio_source_langs = self.AUDIO_SOURCE_LANGS
+        self.audio_source_map = self.AUDIO_SOURCE_MAP
         saved_src = self.config.get("audio_source_language", "auto")
         src_display = next(
             (k for k, v in self.audio_source_map.items() if v == saved_src), "auto",
@@ -686,6 +744,297 @@ class App(ctk.CTk):
         self._refresh_audio_apps()
         self._on_audio_capture_mode_change()
 
+    INTERVIEW_TYPES = ["Geral", "Técnica", "Comportamental", "RH / Cultura"]
+
+    def _build_interview_tab(self, parent):
+        parent.configure(fg_color=theme.BG)
+        parent.columnconfigure(0, weight=1)
+        parent.rowconfigure(1, weight=1)
+
+        header = ctk.CTkFrame(parent, fg_color="transparent")
+        header.grid(row=0, column=0, sticky="ew", padx=12, pady=(10, 4))
+        ctk.CTkLabel(
+            header, text="Modo Entrevista",
+            font=(theme.FONT, 14, "bold"), text_color=theme.ACCENT,
+        ).pack(anchor="w")
+        theme.hint_label(
+            header,
+            "Ouve o entrevistador e sugere o que você deve responder.",
+        ).pack(anchor="w")
+
+        if not AUDIO_AVAILABLE:
+            ctk.CTkLabel(
+                parent,
+                text="Disponível apenas no Windows com PyAudioWPatch instalado.",
+                font=(theme.FONT, 11), text_color=theme.ACCENT, wraplength=460,
+            ).grid(row=1, column=0, padx=16, pady=16)
+            self.interview_status_var = tk.StringVar(value="Indisponível")
+            return
+
+        body = ctk.CTkFrame(parent, fg_color="transparent")
+        body.grid(row=1, column=0, sticky="nsew", padx=8, pady=4)
+        body.columnconfigure(0, weight=2)
+        body.columnconfigure(1, weight=3)
+        body.rowconfigure(0, weight=1)
+
+        left = ctk.CTkScrollableFrame(body, fg_color=theme.BG, corner_radius=0)
+        left.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
+        pad = {"padx": 2, "pady": 4}
+
+        theme.hint_label(
+            left, "Configure a API Key na aba Jogo antes de iniciar.",
+        ).pack(anchor="w", pady=(0, 6))
+
+        frame_profile = theme.card(left)
+        frame_profile.pack(fill="x", **pad)
+        frame_profile.columnconfigure(0, weight=1)
+        theme.section_title(frame_profile, "Seu perfil").grid(
+            row=0, column=0, sticky="w", padx=14, pady=(12, 4),
+        )
+        self.interview_context_box = ctk.CTkTextbox(
+            frame_profile, height=72, fg_color=theme.SURFACE_ALT, text_color=theme.TEXT,
+            font=(theme.FONT, 11), corner_radius=theme.CORNER_SM,
+            border_width=1, border_color=theme.BORDER,
+        )
+        self.interview_context_box.grid(row=1, column=0, sticky="ew", padx=14, pady=(0, 12))
+        saved_ctx = self.config.get("interview_context", "")
+        if saved_ctx:
+            self.interview_context_box.insert("1.0", saved_ctx)
+
+        frame_audio = theme.card(left)
+        frame_audio.pack(fill="x", **pad)
+        frame_audio.columnconfigure(1, weight=1)
+        theme.section_title(frame_audio, "Ouvir de").grid(
+            row=0, column=0, columnspan=2, sticky="w", padx=14, pady=(12, 6),
+        )
+
+        theme.field_label(frame_audio, "Capturar de:").grid(
+            row=1, column=0, sticky="w", padx=14, pady=4,
+        )
+        iv_mode_row = ctk.CTkFrame(frame_audio, fg_color="transparent")
+        iv_mode_row.grid(row=1, column=1, sticky="w", padx=14, pady=4)
+        self.interview_capture_mode_var = tk.StringVar(
+            value=self.config.get("interview_capture_mode", "system"),
+        )
+        for mode_id, mode_label in CAPTURE_MODES:
+            ctk.CTkRadioButton(
+                iv_mode_row, text=mode_label, value=mode_id,
+                variable=self.interview_capture_mode_var,
+                command=self._on_interview_capture_mode_change,
+                font=(theme.FONT, 11), text_color=theme.TEXT,
+                fg_color=theme.ACCENT, hover_color="#c73a52",
+            ).pack(side="left", padx=(0, 10))
+
+        self._interview_app_row = ctk.CTkFrame(frame_audio, fg_color="transparent")
+        self._interview_app_row.grid(row=2, column=0, columnspan=2, sticky="ew", padx=14, pady=4)
+        self._interview_app_row.columnconfigure(1, weight=1)
+        theme.field_label(self._interview_app_row, "Aplicativo:").grid(
+            row=0, column=0, sticky="w", pady=4,
+        )
+        iv_app_pick = ctk.CTkFrame(self._interview_app_row, fg_color="transparent")
+        iv_app_pick.grid(row=0, column=1, sticky="ew", pady=4)
+        self.interview_app_var = tk.StringVar(value="")
+        self.interview_app_combo = theme.combo(
+            iv_app_pick, [], variable=self.interview_app_var, width=180,
+        )
+        self.interview_app_combo.pack(side="left", fill="x", expand=True)
+        theme.secondary_btn(
+            iv_app_pick, "Atualizar", self._refresh_interview_apps, width=80,
+        ).pack(side="left", padx=(6, 0))
+
+        self._interview_device_row = ctk.CTkFrame(frame_audio, fg_color="transparent")
+        self._interview_device_row.grid(row=3, column=0, columnspan=2, sticky="ew", padx=14, pady=4)
+        self._interview_device_row.columnconfigure(1, weight=1)
+        theme.field_label(self._interview_device_row, "Dispositivo:").grid(
+            row=0, column=0, sticky="w", pady=4,
+        )
+        iv_dev_row = ctk.CTkFrame(self._interview_device_row, fg_color="transparent")
+        iv_dev_row.grid(row=0, column=1, sticky="ew", pady=4)
+        saved_dev = self.config.get("interview_audio_device", "")
+        self.interview_device_var = tk.StringVar(
+            value=saved_dev if saved_dev else "(Padrão do sistema)",
+        )
+        self.interview_device_combo = theme.combo(
+            iv_dev_row, [], variable=self.interview_device_var, width=180,
+        )
+        self.interview_device_combo.pack(side="left", fill="x", expand=True)
+        theme.secondary_btn(
+            iv_dev_row, "Atualizar", self._refresh_interview_devices, width=80,
+        ).pack(side="left", padx=(6, 0))
+        self._refresh_interview_devices()
+
+        theme.field_label(frame_audio, "Whisper:").grid(row=4, column=0, sticky="w", padx=14, pady=4)
+        self.interview_whisper_var = tk.StringVar(value=self.config.get("whisper_model", "tiny"))
+        theme.combo(
+            frame_audio, WHISPER_MODELS, variable=self.interview_whisper_var, width=160,
+        ).grid(row=4, column=1, sticky="w", padx=14, pady=4)
+
+        theme.field_label(frame_audio, "CPU/GPU:").grid(row=5, column=0, sticky="w", padx=14, pady=4)
+        self.interview_compute_var = tk.StringVar(
+            value=self.config.get("whisper_compute_device", "cpu"),
+        )
+        theme.combo(
+            frame_audio, COMPUTE_OPTIONS, variable=self.interview_compute_var, width=160,
+        ).grid(row=5, column=1, sticky="w", padx=14, pady=(4, 12))
+
+        frame_opts = theme.card(left)
+        frame_opts.pack(fill="x", **pad)
+        frame_opts.columnconfigure(1, weight=1)
+        theme.section_title(frame_opts, "Configuração").grid(
+            row=0, column=0, columnspan=2, sticky="w", padx=14, pady=(12, 6),
+        )
+
+        theme.field_label(frame_opts, "Tipo:").grid(row=1, column=0, sticky="w", padx=14, pady=4)
+        self.interview_type_var = tk.StringVar(value=self.config.get("interview_type", "Geral"))
+        theme.combo(
+            frame_opts, self.INTERVIEW_TYPES, variable=self.interview_type_var, width=160,
+        ).grid(row=1, column=1, sticky="w", padx=14, pady=4)
+
+        theme.field_label(frame_opts, "Respostas:").grid(row=2, column=0, sticky="w", padx=14, pady=4)
+        self.interview_answer_lang_var = tk.StringVar(
+            value=self.config.get("interview_answer_language", "Português"),
+        )
+        theme.combo(
+            frame_opts, self.LANGUAGES, variable=self.interview_answer_lang_var, width=160,
+        ).grid(row=2, column=1, sticky="w", padx=14, pady=4)
+
+        theme.field_label(frame_opts, "Fala:").grid(row=3, column=0, sticky="w", padx=14, pady=4)
+        saved_src = self.config.get("audio_source_language", "auto")
+        src_display = next(
+            (k for k, v in self.AUDIO_SOURCE_MAP.items() if v == saved_src), "auto",
+        )
+        self.interview_source_var = tk.StringVar(value=src_display)
+        theme.combo(
+            frame_opts, self.AUDIO_SOURCE_LANGS, variable=self.interview_source_var, width=160,
+        ).grid(row=3, column=1, sticky="w", padx=14, pady=4)
+
+        self.interview_streaming_var = tk.BooleanVar(
+            value=self.config.get("interview_streaming", True),
+        )
+        ctk.CTkCheckBox(
+            frame_opts, text="Streaming",
+            variable=self.interview_streaming_var,
+            font=(theme.FONT, 11), text_color=theme.TEXT,
+            fg_color=theme.ACCENT, hover_color="#c73a52",
+        ).grid(row=4, column=0, columnspan=2, sticky="w", padx=14, pady=(4, 12))
+
+        self._interview_apps: list[dict] = []
+        self._refresh_interview_apps()
+        self._on_interview_capture_mode_change()
+
+        right = theme.card(body)
+        right.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
+        right.columnconfigure(0, weight=1)
+        right.rowconfigure(4, weight=1)
+
+        self.interview_status_var = tk.StringVar(value="Parado")
+        ctk.CTkLabel(
+            right, textvariable=self.interview_status_var,
+            font=(theme.FONT, 11), text_color=theme.TEXT_DIM,
+        ).grid(row=0, column=0, sticky="w", padx=14, pady=(12, 4))
+
+        ctk.CTkLabel(
+            right, text="Pergunta do entrevistador",
+            font=(theme.FONT, 10), text_color=theme.TEXT_MUTED,
+        ).grid(row=1, column=0, sticky="w", padx=14, pady=(4, 2))
+
+        self.interview_question_box = ctk.CTkTextbox(
+            right, height=72, fg_color=theme.SURFACE_ALT, text_color=theme.TEXT,
+            font=(theme.FONT, 12), corner_radius=theme.CORNER_SM,
+            border_width=1, border_color=theme.BORDER,
+        )
+        self.interview_question_box.grid(row=2, column=0, sticky="ew", padx=14, pady=(0, 8))
+        self.interview_question_box.configure(state="disabled")
+
+        ans_hdr = ctk.CTkFrame(right, fg_color="transparent")
+        ans_hdr.grid(row=3, column=0, sticky="ew", padx=14, pady=(4, 2))
+        ans_hdr.columnconfigure(0, weight=1)
+        ctk.CTkLabel(
+            ans_hdr, text="O que você deve responder",
+            font=(theme.FONT, 11, "bold"), text_color=theme.ACCENT,
+        ).grid(row=0, column=0, sticky="w")
+        theme.secondary_btn(
+            ans_hdr, "Copiar", self._copy_interview_answer, width=80, height=26,
+            font=(theme.FONT, 10),
+        ).grid(row=0, column=1, sticky="e")
+
+        self.interview_answer_box = ctk.CTkTextbox(
+            right, fg_color=theme.BG, text_color="#ffffff",
+            font=(theme.FONT, 14), corner_radius=theme.CORNER_SM,
+            border_width=2, border_color=theme.ACCENT,
+            wrap="word",
+        )
+        self.interview_answer_box.grid(row=4, column=0, sticky="nsew", padx=14, pady=(0, 12))
+        self.interview_answer_box.configure(state="disabled")
+
+        footer = ctk.CTkFrame(parent, fg_color="transparent")
+        footer.grid(row=2, column=0, sticky="ew", padx=12, pady=(4, 10))
+        footer.columnconfigure(0, weight=1)
+
+        hist_hdr = ctk.CTkFrame(footer, fg_color="transparent")
+        hist_hdr.grid(row=0, column=0, sticky="ew", pady=(0, 2))
+        ctk.CTkLabel(
+            hist_hdr, text="Histórico da sessão",
+            font=(theme.FONT, 10), text_color=theme.TEXT_MUTED,
+        ).pack(side="left")
+        theme.ghost_btn(
+            hist_hdr, "Limpar", self._clear_interview_history, width=70, height=26,
+            font=(theme.FONT, 10),
+        ).pack(side="right")
+
+        self.interview_history_box = ctk.CTkTextbox(
+            footer, height=64, fg_color=theme.SURFACE, text_color=theme.TEXT_DIM,
+            font=(theme.FONT, 10), corner_radius=theme.CORNER_SM,
+            border_width=1, border_color=theme.BORDER,
+        )
+        self.interview_history_box.grid(row=1, column=0, sticky="ew", pady=(0, 8))
+        self.interview_history_box.configure(state="disabled")
+
+        self.btn_interview_start = theme.primary_btn(
+            footer, "Iniciar modo entrevista", self._toggle_interview, height=44,
+        )
+        self.btn_interview_start.grid(row=2, column=0, sticky="ew")
+
+    def _set_textbox(self, box: ctk.CTkTextbox, text: str, readonly: bool = True):
+        try:
+            current = box.get("1.0", "end-1c")
+            if current == text:
+                return
+            box.configure(state="normal")
+            box.delete("1.0", "end")
+            if text:
+                box.insert("1.0", text)
+            if readonly:
+                box.configure(state="disabled")
+        except Exception as exc:
+            from src.debug_log import log
+            log(f"Erro ao atualizar textbox: {exc}")
+
+    def _copy_interview_answer(self):
+        text = self.interview_answer_box.get("1.0", "end").strip()
+        if text:
+            self.clipboard_clear()
+            self.clipboard_append(text)
+            self.interview_status_var.set("Resposta copiada!")
+
+    def _clear_interview_history(self):
+        self._set_textbox(self.interview_history_box, "")
+
+    def _append_interview_history(self, question: str, answer: str):
+        try:
+            self.interview_history_box.configure(state="normal")
+            if self.interview_history_box.get("1.0", "end").strip():
+                self.interview_history_box.insert("end", "\n\n")
+            self.interview_history_box.insert(
+                "end",
+                f"P: {question}\nR: {answer}",
+            )
+            self.interview_history_box.see("end")
+            self.interview_history_box.configure(state="disabled")
+        except Exception as exc:
+            from src.debug_log import log
+            log(f"Erro ao atualizar histórico: {exc}")
+
     def _on_audio_capture_mode_change(self):
         mode = self.audio_capture_mode_var.get()
         if mode == "application":
@@ -694,6 +1043,52 @@ class App(ctk.CTk):
         else:
             self._app_row.grid_remove()
             self._device_row.grid()
+
+    def _on_interview_capture_mode_change(self):
+        mode = self.interview_capture_mode_var.get()
+        if mode == "application":
+            self._interview_app_row.grid()
+            self._interview_device_row.grid_remove()
+        else:
+            self._interview_app_row.grid_remove()
+            self._interview_device_row.grid()
+
+    def _refresh_interview_apps(self):
+        if not AUDIO_AVAILABLE or not is_app_capture_supported():
+            return
+        self._interview_apps = list_audio_applications()
+        labels = [a["label"] for a in self._interview_apps]
+        if not labels:
+            labels = ["(Nenhum app com áudio — abra a chamada e clique Atualizar)"]
+        self.interview_app_combo.configure(values=labels)
+        saved_pid = self.config.get("interview_target_pid", 0)
+        match = next((a for a in self._interview_apps if a["pid"] == saved_pid), None)
+        if match:
+            self.interview_app_var.set(match["label"])
+        elif self._interview_apps:
+            self.interview_app_var.set(self._interview_apps[0]["label"])
+        else:
+            self.interview_app_var.set(labels[0])
+
+    def _refresh_interview_devices(self):
+        if not AUDIO_AVAILABLE:
+            return
+        devices = ["(Padrão do sistema)"] + list_output_devices()
+        self.interview_device_combo.configure(values=devices)
+        current = self.config.get("interview_audio_device", "")
+        if not current:
+            self.interview_device_var.set("(Padrão do sistema)")
+        elif current in devices:
+            self.interview_device_var.set(current)
+        elif devices:
+            self.interview_device_var.set(devices[0])
+
+    def _selected_interview_app_pid(self) -> int | None:
+        label = self.interview_app_var.get()
+        for app in self._interview_apps:
+            if app["label"] == label:
+                return app["pid"]
+        return None
 
     def _refresh_audio_apps(self):
         if not AUDIO_AVAILABLE or not is_app_capture_supported():
@@ -1337,6 +1732,8 @@ class App(ctk.CTk):
         if not AUDIO_AVAILABLE:
             self.audio_status_var.set("Recurso disponível apenas no Windows.")
             return
+        if self.interview_running:
+            self._stop_interview()
         if self.running:
             self._stop()
         self._save_audio_config()
@@ -1378,38 +1775,47 @@ class App(ctk.CTk):
                     compute_device=self.config.get("whisper_compute_device", "auto"),
                     source_language=self.config["audio_source_language"],
                     streaming=self.config.get("audio_streaming", True),
-                    on_status=lambda msg: self.after(0, self.audio_status_var.set, msg),
-                    on_original=lambda text: self.after(
-                        0, self.audio_original_var.set, f'Ouvido: "{text[:100]}"',
+                    on_status=lambda msg: self._ui(self.audio_status_var.set, msg),
+                    on_original=lambda text: self._ui(
+                        self.audio_original_var.set, f'Ouvido: "{text[:100]}"',
                     ),
-                    on_translation=lambda text: self._on_audio_translation(text),
-                    on_translation_partial=lambda text: self._on_audio_translation_partial(text),
-                    on_error=lambda err: self.after(0, self.audio_status_var.set, f"Erro: {err[:80]}"),
+                    on_translation=self._on_audio_translation,
+                    on_translation_partial=self._on_audio_translation_partial,
+                    on_error=lambda err: self._ui(
+                        self.audio_status_var.set, f"Erro: {err[:80]}",
+                    ),
                 )
                 self.audio_pipeline.start()
                 self.audio_running = True
-                self.after(0, lambda: self.btn_audio_start.configure(
+                self._ui(lambda: self.btn_audio_start.configure(
                     state="normal", text="Parar tradução por áudio", fg_color=theme.DISABLED,
                 ))
             except Exception as e:
-                self.after(0, lambda: self.audio_status_var.set(f"Erro: {str(e)[:80]}"))
-                self.after(0, lambda: self.btn_audio_start.configure(
+                import traceback
+                from src.debug_log import log
+                log(f"Erro ao iniciar áudio: {e}\n{traceback.format_exc()}")
+                self._ui(self.audio_status_var.set, f"Erro: {str(e)[:80]}")
+                self._ui(lambda: self.btn_audio_start.configure(
                     state="normal", text="Iniciar tradução por áudio", fg_color=theme.ACCENT,
                 ))
 
         threading.Thread(target=_run, daemon=True).start()
 
     def _on_audio_translation(self, text: str):
-        preview = f'"{text[:80]}..."' if len(text) > 80 else f'"{text}"'
-        self.audio_translation_var.set(preview)
-        if self.overlay:
-            self.overlay.show_live(text, partial=False)
+        def _update():
+            preview = f'"{text[:80]}..."' if len(text) > 80 else f'"{text}"'
+            self.audio_translation_var.set(preview)
+            if self.overlay:
+                self.overlay.show_live(text, partial=False)
+        self._ui(_update)
 
     def _on_audio_translation_partial(self, text: str):
-        preview = f'"{text[:80]}..."' if len(text) > 80 else f'"{text}"'
-        self.audio_translation_var.set(preview)
-        if self.overlay:
-            self.overlay.show_live(text, partial=True)
+        def _update():
+            preview = f'"{text[:80]}..."' if len(text) > 80 else f'"{text}"'
+            self.audio_translation_var.set(preview)
+            if self.overlay:
+                self.overlay.show_live(text, partial=True)
+        self._ui(_update)
 
     def _stop_audio(self):
         self.audio_running = False
@@ -1423,6 +1829,135 @@ class App(ctk.CTk):
         )
         self.audio_status_var.set("Parado")
 
+    def _save_interview_config(self):
+        self.config["interview_context"] = self.interview_context_box.get("1.0", "end").strip()
+        self.config["interview_type"] = self.interview_type_var.get()
+        self.config["interview_answer_language"] = self.interview_answer_lang_var.get()
+        self.config["interview_streaming"] = self.interview_streaming_var.get()
+        self.config["interview_capture_mode"] = self.interview_capture_mode_var.get()
+        pid = self._selected_interview_app_pid()
+        self.config["interview_target_pid"] = pid or 0
+        device = self.interview_device_var.get()
+        self.config["interview_audio_device"] = "" if device == "(Padrão do sistema)" else device
+        self.config["whisper_model"] = self.interview_whisper_var.get()
+        self.config["whisper_compute_device"] = self.interview_compute_var.get()
+        self.config["audio_source_language"] = self.AUDIO_SOURCE_MAP.get(
+            self.interview_source_var.get(), "auto",
+        )
+        save_config(self.config)
+
+    def _toggle_interview(self):
+        if self.interview_running:
+            self._stop_interview()
+        else:
+            self._start_interview()
+
+    def _start_interview(self):
+        if not AUDIO_AVAILABLE:
+            self.interview_status_var.set("Recurso disponível apenas no Windows.")
+            return
+        if self.audio_running:
+            self._stop_audio()
+        if self.running:
+            self._stop()
+        self._save_interview_config()
+        api_key = self.api_key_var.get().strip() or self.config.get("api_key", "")
+        if not api_key:
+            self.interview_status_var.set("Erro: configure a API Key na aba Jogo.")
+            return
+
+        device = self.config.get("interview_audio_device") or None
+        capture_mode = self.config.get("interview_capture_mode", "system")
+        target_pid = self.config.get("interview_target_pid") or None
+        if capture_mode == "application" and not target_pid:
+            self.interview_status_var.set(
+                "Erro: selecione um aplicativo com áudio (clique Atualizar).",
+            )
+            return
+
+        self.btn_interview_start.configure(
+            state="disabled", text="Iniciando...", fg_color=theme.DISABLED,
+        )
+        self.interview_status_var.set("Carregando...")
+        self._interview_answer_cache = ""
+        self._set_textbox(self.interview_question_box, "")
+        self._set_textbox(self.interview_answer_box, "", readonly=False)
+
+        def _run():
+            try:
+                translator = Translator(
+                    api_key=api_key,
+                    provider=self.provider_var.get(),
+                    target_language=self.interview_answer_lang_var.get(),
+                    custom_base_url=self.base_url_var.get(),
+                    model=self.model_var.get(),
+                )
+                self.interview_pipeline = AudioPipeline(
+                    translator=translator,
+                    device=device,
+                    capture_mode=capture_mode,
+                    target_pid=target_pid if capture_mode == "application" else None,
+                    whisper_model=self.config["whisper_model"],
+                    compute_device=self.config.get("whisper_compute_device", "auto"),
+                    source_language=self.config["audio_source_language"],
+                    streaming=self.config.get("interview_streaming", True),
+                    mode="interview",
+                    interview_context=self.config.get("interview_context", ""),
+                    interview_type=self.config.get("interview_type", "Geral"),
+                    answer_language=self.config.get("interview_answer_language", "Português"),
+                    on_status=lambda msg: self._ui(self.interview_status_var.set, msg),
+                    on_original=lambda text: self._ui(self._on_interview_question, text),
+                    on_translation=lambda text: self._ui(self._on_interview_answer, text),
+                    on_translation_partial=lambda text: self._ui(
+                        self._on_interview_answer_partial, text,
+                    ),
+                    on_error=lambda err: self._ui(
+                        self.interview_status_var.set, f"Erro: {err[:80]}",
+                    ),
+                )
+                self.interview_pipeline.start()
+                self.interview_running = True
+                self._ui(lambda: self.btn_interview_start.configure(
+                    state="normal", text="Parar modo entrevista", fg_color=theme.DISABLED,
+                ))
+            except Exception as e:
+                import traceback
+                from src.debug_log import log
+                log(f"Erro ao iniciar entrevista: {e}\n{traceback.format_exc()}")
+                self._ui(self.interview_status_var.set, f"Erro: {str(e)[:80]}")
+                self._ui(lambda: self.btn_interview_start.configure(
+                    state="normal", text="Iniciar modo entrevista", fg_color=theme.ACCENT,
+                ))
+
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _on_interview_question(self, text: str):
+        self._set_textbox(self.interview_question_box, text)
+        self._last_interview_question = text
+
+    def _on_interview_answer(self, text: str):
+        self._interview_answer_cache = text
+        self._set_textbox(self.interview_answer_box, text, readonly=False)
+        question = getattr(self, "_last_interview_question", "")
+        if question and text:
+            self._append_interview_history(question, text)
+
+    def _on_interview_answer_partial(self, text: str):
+        if text == self._interview_answer_cache:
+            return
+        self._interview_answer_cache = text
+        self._set_textbox(self.interview_answer_box, text, readonly=False)
+
+    def _stop_interview(self):
+        self.interview_running = False
+        if self.interview_pipeline:
+            self.interview_pipeline.stop()
+            self.interview_pipeline = None
+        self.btn_interview_start.configure(
+            state="normal", text="Iniciar modo entrevista", fg_color=theme.ACCENT,
+        )
+        self.interview_status_var.set("Parado")
+
     def _toggle(self):
         if self.running:
             self._stop()
@@ -1432,6 +1967,8 @@ class App(ctk.CTk):
     def _start(self):
         if self.audio_running:
             self._stop_audio()
+        if self.interview_running:
+            self._stop_interview()
         self._save()
         if not self.config["api_key"]:
             self.status_var.set("Erro: informe a API Key!")
@@ -1588,6 +2125,15 @@ class RegionSelector(tk.Toplevel):
 
 
 if __name__ == "__main__":
+    def _thread_excepthook(args):
+        import traceback
+        from src.debug_log import log
+        log(f"Erro em thread {args.thread.name}: {args.exc_value}\n{traceback.format_exc()}")
+        if _DEBUG:
+            traceback.print_exception(args.exc_type, args.exc_value, args.exc_traceback)
+
+    threading.excepthook = _thread_excepthook
+
     try:
         if _DEBUG:
             print("[Nidus] Iniciando interface...")

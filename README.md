@@ -36,7 +36,7 @@ Se quiser, você pode apoiar o projeto voluntariamente (via Pix, dentro do app),
 2. Execute e conceda permissão de administrador quando o Windows pedir
 3. Configure sua API Key e comece a usar
 
-> Baixe sempre pelo link acima. Versão atual: [v1.0.4](https://github.com/Ettym200/nidus-pc/releases/tag/v1.0.4)
+> Baixe sempre pelo link acima. Versão atual: [v1.0.5](https://github.com/Ettym200/nidus-pc/releases/tag/v1.0.5)
 
 ---
 
@@ -120,6 +120,17 @@ O overlay mostra até 4 linhas de histórico, com fundo transparente e contorno 
 
 **Modo desenvolvedor:** execute `scripts\iniciar_debug.bat` para ver logs detalhados (`NIDUS_DEBUG=1`).
 
+### 6. Modo Entrevista
+
+Na aba **Entrevista**, o Nidus ouve o entrevistador e sugere o que você deve responder — ideal para entrevistas online.
+
+1. Preencha **Seu perfil** (cargo, stack, experiência)
+2. Configure **Ouvir de** (todo o sistema ou app da chamada)
+3. Escolha idioma das respostas e tipo de entrevista
+4. Clique **Iniciar modo entrevista**
+
+A pergunta é montada enquanto o entrevistador fala e a resposta só é gerada após uma pausa breve.
+
 ---
 
 ## Atalhos
@@ -140,7 +151,9 @@ Para trocar um atalho: clique no campo correspondente e pressione a tecla ou bot
 ## Funcionalidades
 
 - Tradução em tempo real ou sob demanda (captura de tela + IA)
+- **Modo Entrevista** — ouve perguntas e sugere respostas com base no seu perfil
 - **Tradução por áudio (Live)** — captura áudio do sistema ou de um app, STT com Whisper, tradução via API
+- Filtro anti-alucinação do Whisper (evita repetições como "hum hum hum")
 - Captura por aplicativo (ex.: só o navegador, sem Discord)
 - Overlay transparente com contorno nas letras e redimensionamento automático
 - Histórico de até 4 linhas no modo Live

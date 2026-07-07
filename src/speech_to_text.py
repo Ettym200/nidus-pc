@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeou
 import numpy as np
 
 from src.debug_log import log
+from src.text_sanitize import sanitize_speech_text
 
 WHISPER_MODELS = ["tiny", "base", "small", "medium"]
 COMPUTE_OPTIONS = ["cpu", "auto", "cuda"]
@@ -105,16 +106,36 @@ class SpeechToText:
             beam_size=1,
             condition_on_previous_text=False,
             temperature=0.0,
+            compression_ratio_threshold=2.2,
+            log_prob_threshold=-1.0,
+            no_speech_threshold=0.65,
         )
-        parts = [seg.text.strip() for seg in segments if seg.text.strip()]
+        parts = []
+        for seg in segments:
+            text = seg.text.strip()
+            if not text:
+                continue
+            no_speech = getattr(seg, "no_speech_prob", 0.0) or 0.0
+            avg_logprob = getattr(seg, "avg_logprob", 0.0) or 0.0
+            if no_speech > 0.7:
+                continue
+            if avg_logprob < -1.2:
+                continue
+            parts.append(text)
         detected = getattr(info, "language", None)
-        text = " ".join(parts)
+        text = sanitize_speech_text(" ".join(parts))
         log(f"STT: {len(audio)/16000:.1f}s → '{text[:80]}' (lang={detected})")
         return text
 
     def transcribe(self, audio: np.ndarray) -> str:
         self.load()
         duration = len(audio) / 16000
+        if duration < 0.4:
+            return ""
+        rms = float(np.sqrt(np.mean(audio.astype(np.float32) ** 2))) if len(audio) else 0.0
+        if rms < 0.008:
+            log(f"STT ignorado — áudio muito baixo (rms={rms:.4f})")
+            return ""
         log(f"Transcrevendo {duration:.1f}s de áudio ({self.device.upper()})...")
 
         for attempt in range(2):

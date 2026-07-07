@@ -125,6 +125,83 @@ class Translator:
                 _emit(delta)
         return self._clean("".join(parts))
 
+    def suggest_interview_answer(
+        self,
+        question: str,
+        answer_language: str,
+        context: str = "",
+        interview_type: str = "Geral",
+        on_delta=None,
+    ) -> str:
+        """Gera sugestão de resposta para entrevista (com streaming opcional)."""
+        log(f"API entrevista ({self.provider}) → {answer_language}")
+        prompt = self._interview_prompt(question, answer_language, context, interview_type)
+        parts: list[str] = []
+
+        def _emit(delta: str):
+            if not delta:
+                return
+            parts.append(delta)
+            if on_delta:
+                on_delta("".join(parts))
+
+        if self.provider == "anthropic":
+            if on_delta:
+                with self._client.messages.stream(
+                    model=self._get_model(),
+                    max_tokens=2000,
+                    messages=[{"role": "user", "content": prompt}],
+                ) as stream:
+                    for event in stream.text_stream:
+                        _emit(event)
+            else:
+                response = self._client.messages.create(
+                    model=self._get_model(),
+                    max_tokens=2000,
+                    messages=[{"role": "user", "content": prompt}],
+                )
+                return self._clean(response.content[0].text.strip())
+            return self._clean("".join(parts))
+
+        response = self._client.chat.completions.create(
+            model=self._get_model(),
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=2000,
+            stream=bool(on_delta),
+        )
+        if on_delta:
+            for chunk in response:
+                delta = chunk.choices[0].delta.content
+                if delta:
+                    _emit(delta)
+            return self._clean("".join(parts))
+
+        return self._clean(response.choices[0].message.content.strip())
+
+    def _interview_prompt(
+        self,
+        question: str,
+        answer_language: str,
+        context: str,
+        interview_type: str,
+    ) -> str:
+        ctx = context.strip() or "(Nenhum contexto fornecido — responda de forma genérica e profissional.)"
+        return (
+            f"You are an expert interview coach helping a candidate respond live.\n\n"
+            f"Candidate context:\n{ctx}\n\n"
+            f"Interview type: {interview_type}\n"
+            f"The interviewer said (full statement, may include multiple sentences):\n\"{question}\"\n\n"
+            f"Write the best answer the candidate should say aloud, in {answer_language}.\n"
+            f"Rules:\n"
+            f"- Read the ENTIRE statement before answering — it may be a long or multi-part question\n"
+            f"- Sound natural and spoken (not a written essay)\n"
+            f"- Be professional, confident, and concise\n"
+            f"- Address all parts of the question if there are several\n"
+            f"- Prefer 2–6 sentences unless the question needs more detail\n"
+            f"- Do not invent specific facts not supported by the context\n"
+            f"- Respond ONLY with the suggested answer — no labels, quotes, or explanations"
+        )
+
     def translate(self, img: Image.Image) -> str:
         b64 = _img_to_base64(img)
         prompt = PROMPT.format(lang=self.target_language)
