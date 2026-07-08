@@ -53,7 +53,7 @@ import customtkinter as ctk
 from PIL import Image
 from src.capture import ScreenCapture
 from src.translator import Translator, KNOWN_PROVIDERS
-from src.overlay import Overlay
+from src.overlay import Overlay, OVERLAY_STYLE_OPTIONS
 from src.audio_pipeline import AudioPipeline
 from src.speech_to_text import WHISPER_MODELS, COMPUTE_OPTIONS
 
@@ -105,6 +105,7 @@ DEFAULT_CONFIG = {
     "interview_capture_mode": "system",
     "interview_target_pid": 0,
     "interview_audio_device": "",
+    "overlay_style": "transparent",
 }
 
 
@@ -456,6 +457,33 @@ class App(ctk.CTk):
             button_color=theme.ACCENT, button_hover_color="#c73a52",
             width=220,
         ).pack(side="left", padx=(8, 0), pady=4)
+
+        theme.field_label(frame_trans, "Fundo do overlay:").grid(
+            row=4, column=0, sticky="w", padx=14, pady=4,
+        )
+        self.overlay_style_var = tk.StringVar(
+            value=self.config.get("overlay_style", "transparent"),
+        )
+        overlay_labels = [label for _id, label in OVERLAY_STYLE_OPTIONS]
+        overlay_ids = {label: sid for sid, label in OVERLAY_STYLE_OPTIONS}
+        self._overlay_style_ids = overlay_ids
+        saved_style = self.config.get("overlay_style", "transparent")
+        style_display = next(
+            (label for sid, label in OVERLAY_STYLE_OPTIONS if sid == saved_style),
+            OVERLAY_STYLE_OPTIONS[0][1],
+        )
+        self.overlay_style_var.set(style_display)
+        theme.combo(
+            frame_trans,
+            overlay_labels,
+            variable=self.overlay_style_var,
+            command=self._on_overlay_style_change,
+            width=220,
+        ).grid(row=4, column=1, sticky="w", padx=14, pady=4)
+        theme.hint_label(
+            frame_trans,
+            "Transparente = só o texto | Escuro/Preto/Azul = caixa colorida",
+        ).grid(row=5, column=0, columnspan=2, sticky="w", padx=14, pady=(0, 12))
 
         # ── Região monitorada ────────────────────────────────────────────
         frame_region = theme.card(f)
@@ -1656,6 +1684,24 @@ class App(ctk.CTk):
             self.overlay._root.after(0, self.overlay._root.deiconify)
             self.overlay._visible = True
 
+    def _overlay_style_id(self) -> str:
+        label = self.overlay_style_var.get()
+        return self._overlay_style_ids.get(label, "transparent")
+
+    def _on_overlay_style_change(self, _choice=None):
+        style_id = self._overlay_style_id()
+        self.config["overlay_style"] = style_id
+        if self.overlay:
+            self.overlay.set_style(style_id)
+
+    def _ensure_overlay(self) -> Overlay:
+        style = self.config.get("overlay_style", "transparent")
+        if not self.overlay:
+            self.overlay = Overlay(style=style)
+        else:
+            self.overlay.set_style(style)
+        return self.overlay
+
     def _on_mode_change(self):
         if self.mode_var.get() == "once":
             self.interval_frame.grid_remove()
@@ -1686,11 +1732,13 @@ class App(ctk.CTk):
         self.config["hotkey_translate"] = self.hotkey_translate_var.get()
         self.config["hotkey_toggle"] = self.hotkey_toggle_var.get()
         self.config["hotkey_audio"] = self.hotkey_audio_var.get()
+        self.config["overlay_style"] = self._overlay_style_id()
         try:
             self.config["monitor_index"] = int(self.monitor_var.get().split()[1]) - 1
         except Exception:
             self.config["monitor_index"] = 0
         save_config(self.config)
+        self._on_overlay_style_change()
         self._register_hotkeys()
         self.status_var.set("Configurações salvas!")
 
@@ -1743,7 +1791,7 @@ class App(ctk.CTk):
             return
 
         if not self.overlay:
-            self.overlay = Overlay()
+            self._ensure_overlay()
 
         device = self.config.get("audio_device") or None
         capture_mode = self.config.get("audio_capture_mode", "system")
@@ -1978,7 +2026,7 @@ class App(ctk.CTk):
             return
 
         if not self.overlay:
-            self.overlay = Overlay()
+            self._ensure_overlay()
         self.translator = Translator(
             api_key=self.config["api_key"],
             provider=self.config["api_provider"],

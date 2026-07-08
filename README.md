@@ -8,13 +8,29 @@ Nidus é um aplicativo de tradução para **PC (Windows)** que exibe um overlay 
 
 ## Capturas de tela
 
-Configuração da API, idioma e modo de tradução:
+### Aba Jogo — tradução por tela
 
-![Configuração do Nidus](docs/screenshot-config.png)
+Configuração da API, região monitorada, atalhos, estilo do overlay e botões de ação:
 
-Região monitorada, atalhos e controles principais:
+![Aba Jogo — tradução por tela](docs/screenshot-jogo.png)
 
-![Controles do Nidus](docs/screenshot-controles.png)
+### Aba Live — tradução por áudio
+
+Captura de áudio do sistema ou de um app, Whisper e tradução em tempo real:
+
+![Aba Live — tradução por áudio](docs/screenshot-live.png)
+
+### Aba Entrevista — assistente para entrevistas
+
+Ouve o entrevistador e sugere respostas com base no seu perfil:
+
+![Aba Entrevista](docs/screenshot-entrevista.png)
+
+### Aba Traduzir Texto
+
+Tradutor manual para colar e traduzir qualquer texto:
+
+![Aba Traduzir Texto](docs/screenshot-texto.png)
 
 ---
 
@@ -155,7 +171,7 @@ Para trocar um atalho: clique no campo correspondente e pressione a tecla ou bot
 - **Tradução por áudio (Live)** — captura áudio do sistema ou de um app, STT com Whisper, tradução via API
 - Filtro anti-alucinação do Whisper (evita repetições como "hum hum hum")
 - Captura por aplicativo (ex.: só o navegador, sem Discord)
-- Overlay transparente com contorno nas letras e redimensionamento automático
+- Overlay configurável: transparente, semi-transparente, escuro, preto ou azul
 - Histórico de até 4 linhas no modo Live
 - Tradução em streaming (texto aparece aos poucos)
 - Overlay arrastável e redimensionável sobre qualquer jogo

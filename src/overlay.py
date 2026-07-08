@@ -16,22 +16,96 @@ TEXT_MARGIN = 8
 OUTLINE_COLOR = "#000000"
 OUTLINE_WIDTH = 2
 
+OVERLAY_STYLE_OPTIONS = [
+    ("transparent", "Transparente"),
+    ("semi", "Semi-transparente"),
+    ("dark", "Escuro"),
+    ("black", "Preto"),
+    ("blue", "Azul escuro"),
+]
+
+OVERLAY_STYLES = {
+    "transparent": {
+        "chroma": True,
+        "bg": CHROMA,
+        "alpha": 1.0,
+        "panel_fill": "black",
+        "panel_stipple": "gray50",
+    },
+    "semi": {
+        "chroma": False,
+        "bg": theme.SURFACE_ALT,
+        "alpha": 0.82,
+        "panel_fill": "#0a0a14",
+        "panel_stipple": "",
+    },
+    "dark": {
+        "chroma": False,
+        "bg": theme.SURFACE_ALT,
+        "alpha": 0.95,
+        "panel_fill": theme.SURFACE,
+        "panel_stipple": "",
+    },
+    "black": {
+        "chroma": False,
+        "bg": "#0a0a0a",
+        "alpha": 0.92,
+        "panel_fill": "#000000",
+        "panel_stipple": "",
+    },
+    "blue": {
+        "chroma": False,
+        "bg": "#0d1b2a",
+        "alpha": 0.92,
+        "panel_fill": "#081018",
+        "panel_stipple": "",
+    },
+}
+
 
 class Overlay:
-    def __init__(self):
+    def __init__(self, style: str = "transparent"):
+        self._style_id = style if style in OVERLAY_STYLES else "transparent"
         self._ready = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
         self._ready.wait()
 
-    def _apply_transparency(self):
+    def _style(self) -> dict:
+        return OVERLAY_STYLES.get(self._style_id, OVERLAY_STYLES["transparent"])
+
+    def set_style(self, style: str):
+        if style not in OVERLAY_STYLES:
+            style = "transparent"
+        self._style_id = style
+        if getattr(self, "_root", None):
+            self._root.after(0, self._apply_style)
+
+    def _apply_style(self):
+        cfg = self._style()
+        bg = cfg["bg"]
+        self._transparent = cfg["chroma"]
+
         try:
-            self._root.configure(bg=CHROMA)
-            self._root.attributes("-transparentcolor", CHROMA)
-            self._transparent = True
+            if cfg["chroma"]:
+                self._root.attributes("-transparentcolor", CHROMA)
+                self._root.attributes("-alpha", 1.0)
+            else:
+                self._root.attributes("-transparentcolor", "")
+                self._root.attributes("-alpha", cfg["alpha"])
         except tk.TclError:
-            self._root.attributes("-alpha", OVERLAY_ALPHA_FALLBACK)
+            self._root.attributes("-alpha", cfg["alpha"] if not cfg["chroma"] else OVERLAY_ALPHA_FALLBACK)
             self._transparent = False
+            bg = theme.SURFACE_ALT
+
+        self._root.configure(bg=bg if not self._transparent else CHROMA)
+        if getattr(self, "_frame", None):
+            self._frame.configure(bg=bg if not self._transparent else CHROMA)
+        if getattr(self, "_canvas", None):
+            self._canvas.configure(bg=bg if not self._transparent else CHROMA)
+
+    def _apply_transparency(self):
+        self._apply_style()
 
     def _run(self):
         self._root = tk.Tk()
@@ -48,7 +122,7 @@ class Overlay:
         self._y = sh - 160
         self._root.geometry(f"{self._w}x{self._h}+{self._x}+{self._y}")
 
-        bg = CHROMA if getattr(self, "_transparent", False) else theme.SURFACE_ALT
+        bg = CHROMA if getattr(self, "_transparent", False) else self._style()["bg"]
 
         self._frame = tk.Frame(self._root, bg=bg, cursor="fleur")
         self._frame.place(relx=0, rely=0, relwidth=1, relheight=1)
@@ -89,6 +163,7 @@ class Overlay:
         self._live_history: list[str] = []
         self._live_partial = ""
 
+        self._apply_style()
         self._ready.set()
         self._root.mainloop()
 
@@ -154,10 +229,17 @@ class Overlay:
         bbox = self._measure_text_bbox(text, font, justify, wrap_width)
         pad_x, pad_y = TEXT_MARGIN + OUTLINE_WIDTH, TEXT_MARGIN + OUTLINE_WIDTH
         if bbox:
-            self._canvas.create_rectangle(
-                bbox[0] - pad_x, bbox[1] - pad_y, bbox[2] + pad_x, bbox[3] + pad_y,
-                fill="black", outline="", stipple="gray50",
-            )
+            panel = self._style()
+            if panel["panel_stipple"]:
+                self._canvas.create_rectangle(
+                    bbox[0] - pad_x, bbox[1] - pad_y, bbox[2] + pad_x, bbox[3] + pad_y,
+                    fill=panel["panel_fill"], outline="", stipple=panel["panel_stipple"],
+                )
+            else:
+                self._canvas.create_rectangle(
+                    bbox[0] - pad_x, bbox[1] - pad_y, bbox[2] + pad_x, bbox[3] + pad_y,
+                    fill=panel["panel_fill"], outline="",
+                )
 
         for dx, dy in self._outline_offsets():
             self._canvas.create_text(

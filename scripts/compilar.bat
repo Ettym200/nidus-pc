@@ -37,8 +37,20 @@ python -m PyInstaller --noconfirm --onefile --windowed ^
   --hidden-import src.overlay ^
   --hidden-import src.ui_theme ^
   --hidden-import src.updater ^
+  --hidden-import src.audio_pipeline ^
+  --hidden-import src.audio_capture ^
+  --hidden-import src.app_audio_capture ^
+  --hidden-import src.audio_sources ^
+  --hidden-import src.speech_to_text ^
+  --hidden-import src.vad_processor ^
+  --hidden-import src.interview_buffer ^
+  --hidden-import src.text_sanitize ^
+  --hidden-import src.debug_log ^
+  --hidden-import faster_whisper ^
+  --hidden-import pyaudiowpatch ^
   --collect-all customtkinter ^
   --collect-all mss ^
+  --collect-all faster_whisper ^
   main.py
 
 echo.
