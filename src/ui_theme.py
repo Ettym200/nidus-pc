@@ -55,15 +55,15 @@ def field_label(parent, text, **kwargs):
 
 
 def hint_label(parent, text, **kwargs):
-    return ctk.CTkLabel(
-        parent, text=text,
+    opts = dict(
         font=(FONT, 10),
         text_color=TEXT_MUTED,
         anchor="w",
         wraplength=400,
         justify="left",
-        **kwargs,
     )
+    opts.update(kwargs)
+    return ctk.CTkLabel(parent, text=text, **opts)
 
 
 def primary_btn(parent, text, command, **kwargs):

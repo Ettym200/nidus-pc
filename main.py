@@ -225,6 +225,8 @@ class App(ctk.CTk):
         self.interview_pipeline = None
         self._ui_queue: queue.Queue = queue.Queue()
         self._interview_answer_cache = ""
+        self._uga_buga_images: list[Image.Image] = []
+        self._uga_photo_refs: list = []
 
         self._build_ui()
         self._poll_ui_queue()
@@ -331,11 +333,13 @@ class App(ctk.CTk):
         tab_live = self.tabs.add("Live")
         tab_interview = self.tabs.add("Entrevista")
         tab_text = self.tabs.add("Traduzir Texto")
+        tab_ugabuga = self.tabs.add("Uga Buga")
 
         self._build_game_tab(tab_game)
         self._build_live_tab(tab_live)
         self._build_interview_tab(tab_interview)
         self._build_text_tab(tab_text)
+        self._build_ugabuga_tab(tab_ugabuga)
 
     def _build_game_tab(self, parent):
         parent.configure(fg_color=theme.BG)
@@ -1212,6 +1216,253 @@ class App(ctk.CTk):
         )
         self.text_output.pack(fill="both", expand=True, padx=10, pady=(0, 10))
         self.text_output.configure(state="disabled")
+
+    def _build_ugabuga_tab(self, parent):
+        parent.configure(fg_color=theme.BG)
+
+        top = ctk.CTkFrame(parent, fg_color="transparent")
+        top.pack(fill="x", padx=12, pady=(12, 6))
+
+        theme.hint_label(
+            top,
+            "Cole o texto da skill/item ou vários prints (Ctrl+V na área de imagens). A IA resume no estilo uga buga.",
+            wraplength=700,
+        ).pack(anchor="w", pady=(0, 8))
+
+        btn_row = ctk.CTkFrame(top, fg_color="transparent")
+        btn_row.pack(fill="x")
+
+        self.btn_uga_summarize = theme.primary_btn(
+            btn_row, "Gerar resumo uga buga", self._do_uga_summarize,
+            height=34, width=200, font=(theme.FONT, 11, "bold"),
+        )
+        self.btn_uga_summarize.pack(side="left")
+
+        theme.secondary_btn(
+            btn_row, "Colar imagem", self._uga_paste_image, width=110, height=34,
+            font=(theme.FONT, 10),
+        ).pack(side="left", padx=(8, 0))
+
+        theme.secondary_btn(
+            btn_row, "Abrir imagem", self._uga_open_image, width=110, height=34,
+            font=(theme.FONT, 10),
+        ).pack(side="left", padx=(6, 0))
+
+        theme.ghost_btn(
+            btn_row, "Remover última", self._uga_remove_last_image, width=110, height=34,
+        ).pack(side="right", padx=(0, 6))
+
+        theme.ghost_btn(
+            btn_row, "Limpar tudo", self._uga_clear_all, width=90, height=34,
+        ).pack(side="right")
+
+        self.uga_status_var = tk.StringVar(value="")
+        ctk.CTkLabel(
+            btn_row, textvariable=self.uga_status_var,
+            font=(theme.FONT, 10), text_color=theme.TEXT_DIM,
+        ).pack(side="left", padx=12)
+
+        body = ctk.CTkFrame(parent, fg_color="transparent")
+        body.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+        body.columnconfigure(0, weight=1)
+        body.columnconfigure(1, weight=1)
+        body.rowconfigure(0, weight=1)
+
+        left = theme.card(body)
+        left.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
+        left.columnconfigure(0, weight=1)
+        left.rowconfigure(2, weight=1)
+
+        theme.section_title(left, "Entrada").grid(
+            row=0, column=0, sticky="w", padx=14, pady=(12, 4),
+        )
+        theme.hint_label(
+            left, "Texto da skill (opcional se tiver print):",
+        ).grid(row=1, column=0, sticky="w", padx=14, pady=(0, 4))
+
+        self.uga_input = ctk.CTkTextbox(
+            left, fg_color=theme.SURFACE_ALT, text_color=theme.TEXT,
+            font=(theme.FONT, 12), corner_radius=theme.CORNER_SM,
+            border_width=1, border_color=theme.BORDER, height=120,
+        )
+        self.uga_input.grid(row=2, column=0, sticky="nsew", padx=14, pady=(0, 8))
+
+        self.uga_preview_frame = ctk.CTkFrame(left, fg_color=theme.SURFACE_ALT, height=140)
+        self.uga_preview_frame.grid(row=3, column=0, sticky="ew", padx=14, pady=(0, 12))
+        self.uga_preview_frame.grid_propagate(False)
+        self.uga_preview_inner = ctk.CTkFrame(self.uga_preview_frame, fg_color="transparent")
+        self.uga_preview_inner.pack(fill="both", expand=True)
+        self.uga_preview_frame.bind("<Control-v>", self._uga_on_paste)
+        self.uga_preview_inner.bind("<Control-v>", self._uga_on_paste)
+
+        right = theme.card(body)
+        right.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
+        right.columnconfigure(0, weight=1)
+        right.rowconfigure(1, weight=1)
+
+        out_hdr = ctk.CTkFrame(right, fg_color="transparent")
+        out_hdr.grid(row=0, column=0, sticky="ew", padx=14, pady=(12, 4))
+        theme.section_title(out_hdr, "Resumo uga buga").pack(side="left")
+        theme.secondary_btn(
+            out_hdr, "Copiar", self._copy_uga_result, width=80, height=26,
+            font=(theme.FONT, 10),
+        ).pack(side="right")
+
+        self.uga_output = ctk.CTkTextbox(
+            right, fg_color=theme.BG, text_color="#f4d35e",
+            font=(theme.FONT, 13), corner_radius=theme.CORNER_SM,
+            border_width=1, border_color=theme.BORDER,
+        )
+        self.uga_output.grid(row=1, column=0, sticky="nsew", padx=14, pady=(0, 12))
+        self.uga_output.configure(state="disabled")
+
+        self._uga_show_preview()
+
+    def _uga_on_paste(self, event=None):
+        if self.tabs.get() != "Uga Buga":
+            return
+        self._uga_paste_image()
+        return "break"
+
+    def _uga_add_image(self, img: Image.Image):
+        self._uga_buga_images.append(img.convert("RGB"))
+        self._uga_show_preview()
+        n = len(self._uga_buga_images)
+        self.uga_status_var.set(f"{n} imagem(ns) — pode colar mais")
+
+    def _uga_show_preview(self):
+        from PIL import ImageTk
+        for w in self.uga_preview_inner.winfo_children():
+            w.destroy()
+        self._uga_photo_refs = []
+        if not self._uga_buga_images:
+            lbl = ctk.CTkLabel(
+                self.uga_preview_inner,
+                text="Nenhuma imagem — Ctrl+V ou Abrir imagem",
+                font=(theme.FONT, 10), text_color=theme.TEXT_MUTED,
+            )
+            lbl.pack(expand=True)
+            lbl.bind("<Control-v>", self._uga_on_paste)
+            return
+        row = ctk.CTkFrame(self.uga_preview_inner, fg_color="transparent")
+        row.pack(fill="both", expand=True, padx=4, pady=4)
+        row.bind("<Control-v>", self._uga_on_paste)
+        for i, img in enumerate(self._uga_buga_images):
+            thumb = img.copy()
+            thumb.thumbnail((96, 96), Image.Resampling.LANCZOS)
+            photo = ImageTk.PhotoImage(thumb)
+            self._uga_photo_refs.append(photo)
+            cell = ctk.CTkFrame(row, fg_color=theme.BG, width=104, height=104)
+            cell.pack(side="left", padx=3)
+            cell.pack_propagate(False)
+            cell.bind("<Control-v>", self._uga_on_paste)
+            ctk.CTkLabel(cell, image=photo, text="").pack(expand=True, pady=(4, 0))
+            ctk.CTkLabel(
+                cell, text=f"#{i + 1}",
+                font=(theme.FONT, 9), text_color=theme.TEXT_DIM,
+            ).pack(pady=(0, 4))
+
+    def _uga_paste_image(self):
+        try:
+            from PIL import ImageGrab
+            data = ImageGrab.grabclipboard()
+            if isinstance(data, Image.Image):
+                self._uga_add_image(data)
+            else:
+                self.uga_status_var.set("Área de transferência sem imagem")
+        except Exception as e:
+            self.uga_status_var.set(f"Erro ao colar: {e}")
+
+    def _uga_open_image(self):
+        from tkinter import filedialog
+        paths = filedialog.askopenfilenames(
+            title="Imagens do item/skill",
+            filetypes=[
+                ("Imagens", "*.png *.jpg *.jpeg *.webp *.bmp *.gif"),
+                ("Todos", "*.*"),
+            ],
+        )
+        if not paths:
+            return
+        added = 0
+        for path in paths:
+            try:
+                self._uga_add_image(Image.open(path))
+                added += 1
+            except Exception as e:
+                self.uga_status_var.set(f"Erro em {os.path.basename(path)}: {e}")
+                return
+        if added:
+            self.uga_status_var.set(f"{len(self._uga_buga_images)} imagem(ns) adicionada(s)")
+
+    def _uga_remove_last_image(self):
+        if not self._uga_buga_images:
+            self.uga_status_var.set("Nenhuma imagem para remover")
+            return
+        self._uga_buga_images.pop()
+        self._uga_show_preview()
+        n = len(self._uga_buga_images)
+        self.uga_status_var.set(f"{n} imagem(ns)" if n else "Imagens removidas")
+
+    def _uga_clear_all(self):
+        self.uga_input.delete("1.0", "end")
+        self._uga_buga_images.clear()
+        self._uga_show_preview()
+        self.uga_output.configure(state="normal")
+        self.uga_output.delete("1.0", "end")
+        self.uga_output.configure(state="disabled")
+        self.uga_status_var.set("")
+
+    def _do_uga_summarize(self):
+        text = self.uga_input.get("1.0", "end").strip()
+        if not text and not self._uga_buga_images:
+            self.uga_status_var.set("Cole texto ou imagem do item/skill")
+            return
+        api_key = self.api_key_var.get().strip() or self.config.get("api_key", "")
+        if not api_key:
+            self.uga_status_var.set("Configure a API Key na aba Jogo")
+            return
+
+        self.btn_uga_summarize.configure(
+            state="disabled", text="Gerando...", fg_color=theme.DISABLED,
+        )
+        self.uga_status_var.set("IA pensando como caverna...")
+        imgs = list(self._uga_buga_images)
+
+        def _run():
+            try:
+                t = Translator(
+                    api_key=api_key,
+                    provider=self.provider_var.get(),
+                    target_language=self.config.get("target_language", "Português"),
+                    custom_base_url=self.base_url_var.get(),
+                    model=self.model_var.get(),
+                )
+                result = t.summarize_uga_buga(text=text, imgs=imgs)
+                self.after(0, lambda: self._set_uga_result(result))
+                self.after(0, lambda: self.uga_status_var.set("Uga uga concluído"))
+            except Exception as e:
+                self.after(0, lambda: self._set_uga_result(f"Erro: {e}"))
+                self.after(0, lambda: self.uga_status_var.set("Erro"))
+            finally:
+                self.after(0, lambda: self.btn_uga_summarize.configure(
+                    state="normal", text="Gerar resumo uga buga", fg_color=theme.ACCENT,
+                ))
+
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _set_uga_result(self, text):
+        self.uga_output.configure(state="normal")
+        self.uga_output.delete("1.0", "end")
+        self.uga_output.insert("1.0", text)
+        self.uga_output.configure(state="disabled")
+
+    def _copy_uga_result(self):
+        result = self.uga_output.get("1.0", "end").strip()
+        if result:
+            self.clipboard_clear()
+            self.clipboard_append(result)
+            self.uga_status_var.set("Copiado!")
 
     # ── Tradução de texto ────────────────────────────────────────────────
 

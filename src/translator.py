@@ -19,6 +19,28 @@ PROMPT = (
     "Se não houver legenda ou diálogo, responda com uma string vazia."
 )
 
+UGA_BUGA_PROMPT = (
+    "Resuma o item, skill, talento ou equipamento de jogo no estilo \"uga buga\" "
+    "(meme brasileiro: linguagem pré-histórica simplificada e engraçada).\n\n"
+    "Exemplos de tom (varie o estilo, não repita a mesma fórmula):\n"
+    "- bater forte, inimigo cai\n"
+    "- dano grandão, muito feliz\n"
+    "- dano grandão = homem feliz\n"
+    "- magia gelo congelá bicho, dano extra se já frio\n"
+    "- escudo grandão, inimigo bate e vc quase nem sente\n"
+    "- cooldown 8s, dá pra spammar na briga\n\n"
+    "Regras:\n"
+    "- Português informal, frases curtas, tom de caverna engraçado\n"
+    "- Use \"= homem feliz\", \"muito feliz\" ou \"vc feliz\" NO MÁXIMO 1 vez no resumo inteiro "
+    "(só na parte mais importante/benefício principal — não em todo tópico)\n"
+    "- A maioria das frases deve descrever o efeito direto, sem falar de felicidade\n"
+    "- 2 a 5 frases OU 3 a 6 tópicos com •\n"
+    "- Explique o que faz de verdade, mas ultra simplificado\n"
+    "- Pode mencionar detalhes menores (cooldown, stack, %, condição) em uga buga\n"
+    "- Não repita a mesma ideia em bullets e parágrafos — resuma uma vez só\n"
+    "- Sem introdução, sem \"aqui está\", sem aspas no começo\n"
+)
+
 # Provedores com base_url pré-configurada
 KNOWN_PROVIDERS = {
     "openai":      {"base_url": None,                              "default_model": "gpt-4o-mini"},
@@ -213,6 +235,86 @@ class Translator:
 
         return self._clean(result)
 
+    def summarize_uga_buga(
+        self,
+        text: str = "",
+        imgs: list[Image.Image] | None = None,
+        img: Image.Image | None = None,
+    ) -> str:
+        """Resumo uga buga de skill/item — texto, uma ou várias imagens."""
+        images = list(imgs or [])
+        if img is not None:
+            images.append(img)
+        extra = text.strip()
+        if images:
+            n = len(images)
+            log(f"API uga buga ({self.provider}) com {n} imagem(ns)")
+            prompt = UGA_BUGA_PROMPT
+            if extra:
+                prompt += f"\nTexto extra fornecido pelo usuário:\n{extra}\n"
+            if n > 1:
+                prompt += (
+                    f"\nSão {n} imagens — leia todas (nome, descrição, stats) "
+                    "e faça um resumo uga buga combinado."
+                )
+            else:
+                prompt += "\nLeia todo o texto visível na imagem (nome, descrição, stats) e resuma."
+            b64_list = [_img_to_base64(im) for im in images]
+            if self.provider == "anthropic":
+                result = self._vision_anthropic(b64_list, prompt, max_tokens=800)
+            else:
+                result = self._vision_openai_compat(b64_list, prompt, max_tokens=800)
+            return self._clean(result)
+
+        if not extra:
+            raise ValueError("Informe texto ou imagem do item/skill.")
+
+        log(f"API uga buga ({self.provider}) só texto")
+        prompt = f"{UGA_BUGA_PROMPT}\n\nTexto do item/skill:\n{extra}"
+        if self.provider == "anthropic":
+            response = self._client.messages.create(
+                model=self._get_model(),
+                max_tokens=800,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            return self._clean(response.content[0].text.strip())
+
+        response = self._client.chat.completions.create(
+            model=self._get_model(),
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=800,
+        )
+        return self._clean(response.choices[0].message.content.strip())
+
+    def _vision_openai_compat(self, b64_list: list[str], prompt: str, max_tokens: int = 300) -> str:
+        content: list[dict] = [{"type": "text", "text": prompt}]
+        for b64 in b64_list:
+            content.append({
+                "type": "image_url",
+                "image_url": {"url": f"data:image/png;base64,{b64}"},
+            })
+        response = self._client.chat.completions.create(
+            model=self._get_model(),
+            messages=[{"role": "user", "content": content}],
+            max_tokens=max_tokens,
+        )
+        return response.choices[0].message.content.strip()
+
+    def _vision_anthropic(self, b64_list: list[str], prompt: str, max_tokens: int = 300) -> str:
+        content: list[dict] = []
+        for b64 in b64_list:
+            content.append({
+                "type": "image",
+                "source": {"type": "base64", "media_type": "image/png", "data": b64},
+            })
+        content.append({"type": "text", "text": prompt})
+        response = self._client.messages.create(
+            model=self._get_model(),
+            max_tokens=max_tokens,
+            messages=[{"role": "user", "content": content}],
+        )
+        return response.content[0].text.strip()
+
     def _clean(self, text: str) -> str:
         # Remove blocos markdown ```...``` que algumas IAs retornam
         import re
@@ -220,29 +322,7 @@ class Translator:
         return text
 
     def _translate_openai_compat(self, b64: str, prompt: str) -> str:
-        response = self._client.chat.completions.create(
-            model=self._get_model(),
-            messages=[{
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
-                ],
-            }],
-            max_tokens=300,
-        )
-        return response.choices[0].message.content.strip()
+        return self._vision_openai_compat([b64], prompt, max_tokens=300)
 
     def _translate_anthropic(self, b64: str, prompt: str) -> str:
-        response = self._client.messages.create(
-            model=self._get_model(),
-            max_tokens=300,
-            messages=[{
-                "role": "user",
-                "content": [
-                    {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": b64}},
-                    {"type": "text", "text": prompt},
-                ],
-            }],
-        )
-        return response.content[0].text.strip()
+        return self._vision_anthropic([b64], prompt, max_tokens=300)
