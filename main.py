@@ -75,7 +75,7 @@ from src import ui_theme as theme
 from src.updater import check_update
 
 CONFIG_FILE = os.path.join(APP_DIR, "config.json")
-APP_VERSION = "1.0.5"
+APP_VERSION = "1.0.6"
 RELEASES_URL = "https://github.com/Ettym200/nidus-pc/releases/latest"
 
 DEFAULT_CONFIG = {

@@ -52,7 +52,7 @@ Se quiser, você pode apoiar o projeto voluntariamente (via Pix, dentro do app),
 2. Execute e conceda permissão de administrador quando o Windows pedir
 3. Configure sua API Key e comece a usar
 
-> Baixe sempre pelo link acima. Versão atual: [v1.0.5](https://github.com/Ettym200/nidus-pc/releases/tag/v1.0.5)
+> Baixe sempre pelo link acima. Versão atual: [v1.0.6](https://github.com/Ettym200/nidus-pc/releases/tag/v1.0.6)
 
 ---
 
