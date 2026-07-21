@@ -75,7 +75,7 @@ from src import ui_theme as theme
 from src.updater import check_update
 
 CONFIG_FILE = os.path.join(APP_DIR, "config.json")
-APP_VERSION = "1.0.6"
+APP_VERSION = "1.0.7"
 RELEASES_URL = "https://github.com/Ettym200/nidus-pc/releases/latest"
 
 DEFAULT_CONFIG = {
@@ -145,7 +145,7 @@ PROVIDER_HINTS = {
     "openai":     "Modelo: gpt-4o-mini  |  openai.com",
     "anthropic":  "Modelo: claude-haiku  |  anthropic.com",
     "openrouter": "Base URL já configurada  |  openrouter.ai",
-    "groq":       "Modelo padrão: llama-4-scout (com visão)  |  groq.com  — GRÁTIS",
+    "groq":       "Modelo padrão: qwen3.6-27b (com visão)  |  groq.com  — GRÁTIS",
     "custom":     "Informe a Base URL abaixo (ex: http://localhost:11434/v1)",
 }
 
@@ -1225,7 +1225,7 @@ class App(ctk.CTk):
 
         theme.hint_label(
             top,
-            "Cole o texto da skill/item ou vários prints (Ctrl+V na área de imagens). A IA resume no estilo uga buga.",
+            "Cole o texto da skill/item ou vários prints (Ctrl+V na área de imagens). Clique ✕ em uma miniatura para remover.",
             wraplength=700,
         ).pack(anchor="w", pady=(0, 8))
 
@@ -1352,15 +1352,35 @@ class App(ctk.CTk):
             thumb.thumbnail((96, 96), Image.Resampling.LANCZOS)
             photo = ImageTk.PhotoImage(thumb)
             self._uga_photo_refs.append(photo)
-            cell = ctk.CTkFrame(row, fg_color=theme.BG, width=104, height=104)
+            cell = ctk.CTkFrame(row, fg_color=theme.BG, width=108, height=124)
             cell.pack(side="left", padx=3)
             cell.pack_propagate(False)
             cell.bind("<Control-v>", self._uga_on_paste)
-            ctk.CTkLabel(cell, image=photo, text="").pack(expand=True, pady=(4, 0))
+            hdr = ctk.CTkFrame(cell, fg_color="transparent")
+            hdr.pack(fill="x", padx=4, pady=(4, 0))
             ctk.CTkLabel(
-                cell, text=f"#{i + 1}",
+                hdr, text=f"#{i + 1}",
                 font=(theme.FONT, 9), text_color=theme.TEXT_DIM,
-            ).pack(pady=(0, 4))
+            ).pack(side="left")
+            ctk.CTkButton(
+                hdr, text="✕", width=22, height=20,
+                fg_color=theme.DANGER, hover_color="#8b2222",
+                text_color="white", corner_radius=4,
+                font=(theme.FONT, 11, "bold"),
+                command=lambda idx=i: self._uga_remove_image(idx),
+            ).pack(side="right")
+            ctk.CTkLabel(cell, image=photo, text="").pack(expand=True, pady=(2, 6))
+
+    def _uga_remove_image(self, index: int):
+        if index < 0 or index >= len(self._uga_buga_images):
+            return
+        self._uga_buga_images.pop(index)
+        self._uga_show_preview()
+        n = len(self._uga_buga_images)
+        if n:
+            self.uga_status_var.set(f"Imagem #{index + 1} removida — {n} restante(s)")
+        else:
+            self.uga_status_var.set("Todas as imagens removidas")
 
     def _uga_paste_image(self):
         try:

@@ -46,7 +46,7 @@ KNOWN_PROVIDERS = {
     "openai":      {"base_url": None,                              "default_model": "gpt-4o-mini"},
     "anthropic":   {"base_url": None,                              "default_model": "claude-haiku-4-5-20251001"},
     "openrouter":  {"base_url": "https://openrouter.ai/api/v1",    "default_model": "openai/gpt-4o-mini"},
-    "groq":        {"base_url": "https://api.groq.com/openai/v1",  "default_model": "meta-llama/llama-4-scout-17b-16e-instruct"},
+    "groq":        {"base_url": "https://api.groq.com/openai/v1",  "default_model": "qwen/qwen3.6-27b"},
     "custom":      {"base_url": None,                              "default_model": ""},
 }
 
