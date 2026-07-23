@@ -219,7 +219,7 @@ Para gerar um executável standalone localmente:
 scripts\compilar.bat
 ```
 
-O arquivo gerado fica em `dist\Nidus.exe`. Para distribuir, publique em [Releases](https://github.com/Ettym200/nidus-pc/releases).
+O arquivo gerado fica em `dist\Nidus.exe`. Se não quiser compilar, baixe o `.exe` pronto em [Releases](https://github.com/Ettym200/nidus-pc/releases/latest).
 
 ---
 
