@@ -85,6 +85,17 @@ class Translator:
                 kwargs["base_url"] = base_url
             self._client = OpenAI(**kwargs)
 
+    def _groq_extra(self) -> dict:
+        if self.provider == "groq":
+            return {"reasoning_effort": "none", "reasoning_format": "hidden"}
+        return {}
+
+    def _openai_chat_create(self, **kwargs):
+        extra = self._groq_extra()
+        if extra:
+            kwargs["extra_body"] = {**(kwargs.get("extra_body") or {}), **extra}
+        return self._client.chat.completions.create(**kwargs)
+
     def translate_text(self, text: str, target_language: str = None) -> str:
         lang = target_language or self.target_language
         prompt = f"Traduza o texto a seguir para {lang}. Responda SOMENTE com a tradução, sem explicações:\n\n{text}"
@@ -96,7 +107,7 @@ class Translator:
             )
             return self._clean(response.content[0].text.strip())
         else:
-            response = self._client.chat.completions.create(
+            response = self._openai_chat_create(
                 model=self._get_model(),
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=2000,
@@ -135,7 +146,7 @@ class Translator:
                     _emit(event)
             return self._clean("".join(parts))
 
-        response = self._client.chat.completions.create(
+        response = self._openai_chat_create(
             model=self._get_model(),
             messages=[{"role": "user", "content": prompt}],
             max_tokens=2000,
@@ -185,7 +196,7 @@ class Translator:
                 return self._clean(response.content[0].text.strip())
             return self._clean("".join(parts))
 
-        response = self._client.chat.completions.create(
+        response = self._openai_chat_create(
             model=self._get_model(),
             messages=[{"role": "user", "content": prompt}],
             max_tokens=2000,
@@ -279,7 +290,7 @@ class Translator:
             )
             return self._clean(response.content[0].text.strip())
 
-        response = self._client.chat.completions.create(
+        response = self._openai_chat_create(
             model=self._get_model(),
             messages=[{"role": "user", "content": prompt}],
             max_tokens=800,
@@ -293,7 +304,7 @@ class Translator:
                 "type": "image_url",
                 "image_url": {"url": f"data:image/png;base64,{b64}"},
             })
-        response = self._client.chat.completions.create(
+        response = self._openai_chat_create(
             model=self._get_model(),
             messages=[{"role": "user", "content": content}],
             max_tokens=max_tokens,
@@ -316,8 +327,13 @@ class Translator:
         return response.content[0].text.strip()
 
     def _clean(self, text: str) -> str:
-        # Remove blocos markdown ```...``` que algumas IAs retornam
         import re
+        text = re.sub(
+            r"<\s*(?:redacted_)?think(?:ing)?\s*>[\s\S]*?<\s*/\s*(?:redacted_)?think(?:ing)?\s*>",
+            "",
+            text,
+            flags=re.IGNORECASE,
+        )
         text = re.sub(r"```[a-z]*\n?", "", text).strip("`").strip()
         return text
 
