@@ -32,6 +32,12 @@ Tradutor manual para colar e traduzir qualquer texto:
 
 ![Aba Traduzir Texto](docs/screenshot-texto.png)
 
+### Aba Uga Buga — resumo de skills/itens
+
+Cole o texto da skill/item (ou vários prints com **Ctrl+V**). A IA gera um resumo curto no estilo meme, em linguagem direta:
+
+![Aba Uga Buga — resumo de skills/itens](docs/screenshot-uga-buga.png)
+
 ---
 
 ## ⚠️ Este aplicativo é 100% gratuito
@@ -147,6 +153,14 @@ Na aba **Entrevista**, o Nidus ouve o entrevistador e sugere o que você deve re
 
 A pergunta é montada enquanto o entrevistador fala e a resposta só é gerada após uma pausa breve.
 
+### 7. Modo Uga Buga
+
+Na aba **Uga Buga**, cole a descrição de uma skill, item ou talento (ou envie prints com **Ctrl+V** / **Abrir imagem**). A IA gera um resumo curto no estilo “uga buga” — ideal para entender mecânicas de RPG/MMO sem ler textão.
+
+1. Cole o texto da skill ou adicione uma ou mais imagens
+2. Clique **Gerar resumo uga buga**
+3. Copie o resultado com **Copiar**
+
 ---
 
 ## Atalhos
@@ -179,6 +193,7 @@ Para trocar um atalho: clique no campo correspondente e pressione a tecla ou bot
 - Suporte a OpenRouter, Groq, OpenAI, Anthropic e APIs customizadas
 - Atalhos globais de teclado e mouse
 - Tradutor de texto manual (aba **Traduzir Texto**)
+- **Uga Buga** — resume skills/itens de jogo a partir de texto ou prints (estilo meme)
 - Detecção inteligente de mudança — só chama a IA quando o texto muda
 
 ---
