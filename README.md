@@ -58,6 +58,8 @@ Se quiser, você pode apoiar o projeto voluntariamente (via Pix, dentro do app),
 2. Execute e conceda permissão de administrador quando o Windows pedir
 3. Configure sua API Key e comece a usar
 
+> **Nota:** com o `.exe` da release você **não precisa** clonar o repositório, instalar Python nem rodar os `.bat` (`instalar.bat`, `iniciar.bat`, etc.). Basta baixar, executar e configurar a API Key. Os scripts `.bat` são só para quem roda o código-fonte.
+
 > Baixe sempre pelo link acima. Versão atual: [v1.0.8](https://github.com/Ettym200/nidus-pc/releases/tag/v1.0.8)
 
 ---
@@ -78,7 +80,7 @@ Quer usar o Nidus no celular? A versão para Android (Flutter) está em outro re
 
 **Windows (executável — recomendado)**
 
-Use o link de download acima. Não precisa instalar Python.
+Use o link de download acima. Não precisa instalar Python, clonar o repo nem usar os `.bat` — só baixar o `Nidus.exe` da [release](https://github.com/Ettym200/nidus-pc/releases/latest) e abrir.
 
 **Windows (código-fonte / desenvolvedores)**
 
