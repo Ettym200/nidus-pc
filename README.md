@@ -50,7 +50,7 @@ Se quiser, você pode apoiar o projeto voluntariamente (via Pix, dentro do app),
 
 ## Download (Windows)
 
-**Forma mais fácil:** baixe o executável pronto na página de releases:
+**Não quer rodar os `.bat`?** Baixe o `Nidus.exe` na página de [Releases](https://github.com/Ettym200/nidus-pc/releases/latest), execute e pronto — não precisa instalar Python nem nada do repositório.
 
 **[Baixar Nidus para Windows (última versão)](https://github.com/Ettym200/nidus-pc/releases/latest)**
 
@@ -58,9 +58,7 @@ Se quiser, você pode apoiar o projeto voluntariamente (via Pix, dentro do app),
 2. Execute e conceda permissão de administrador quando o Windows pedir
 3. Configure sua API Key e comece a usar
 
-> **Nota:** com o `.exe` da release você **não precisa** clonar o repositório, instalar Python nem rodar os `.bat` (`instalar.bat`, `iniciar.bat`, etc.). Basta baixar, executar e configurar a API Key. Os scripts `.bat` são só para quem roda o código-fonte.
-
-> Baixe sempre pelo link acima. Versão atual: [v1.0.8](https://github.com/Ettym200/nidus-pc/releases/tag/v1.0.8)
+> Versão atual: [v1.0.8](https://github.com/Ettym200/nidus-pc/releases/tag/v1.0.8)
 
 ---
 
@@ -80,9 +78,9 @@ Quer usar o Nidus no celular? A versão para Android (Flutter) está em outro re
 
 **Windows (executável — recomendado)**
 
-Use o link de download acima. Não precisa instalar Python, clonar o repo nem usar os `.bat` — só baixar o `Nidus.exe` da [release](https://github.com/Ettym200/nidus-pc/releases/latest) e abrir.
+Baixe o `Nidus.exe` em [Releases](https://github.com/Ettym200/nidus-pc/releases/latest) e execute. Só isso.
 
-**Windows (código-fonte / desenvolvedores)**
+**Windows (código-fonte — usa os `.bat`)**
 
 1. Instale o [Python 3.8+](https://www.python.org/downloads/) — marque **"Add Python to PATH"**
 2. Clone ou baixe este repositório
