@@ -4,6 +4,7 @@ numpy
 openai
 anthropic
 customtkinter
+pywebview>=5.3
 keyboard; sys_platform == "win32"
 mouse; sys_platform == "win32"
 pynput; sys_platform == "linux"
