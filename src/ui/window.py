@@ -11,11 +11,11 @@ from src.ui.controller import NidusController
 
 
 class Api:
-    def __init__(self, app_dir, version):
+    def __init__(self, app_dir, version, debug=False):
         self.app_dir = app_dir
         self.version = version
         self.window = None
-        self.controller = NidusController(app_dir, version, self.notify)
+        self.controller = NidusController(app_dir, version, self.notify, debug=debug)
 
     def attach(self, window):
         self.window = window
@@ -51,7 +51,7 @@ class Api:
 
 
 def launch(app_dir, version, debug=False):
-    api = Api(app_dir, version)
+    api = Api(app_dir, version, debug=debug)
     web_dir = os.path.join(getattr(sys, "_MEIPASS", app_dir), "src", "ui", "web")
     window = webview.create_window(
         "Nidus",

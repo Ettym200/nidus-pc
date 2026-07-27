@@ -1,6 +1,6 @@
+import queue
 import sys
 import threading
-import time
 import tkinter as tk
 
 import keyboard
@@ -16,14 +16,16 @@ from src.ui.region_selector import RegionSelector
 class NidusController:
     OVERLAY_IDS = [sid for sid, _label in OVERLAY_STYLE_OPTIONS]
 
-    def __init__(self, app_dir: str, version: str, notify):
+    def __init__(self, app_dir: str, version: str, notify, *, debug: bool = False):
         self.app_dir = app_dir
         self.version = version
         self.notify = notify
+        self.debug = debug
         self.window = None
         self.config = load_config(app_dir)
-        self._tk = tk.Tk()
-        self._tk.withdraw()
+        self._tk = None
+        self._tk_ready = threading.Event()
+        self._actions: queue.Queue = queue.Queue()
         self.overlay = None
         self.translator = None
         self.capture = None
@@ -32,19 +34,36 @@ class NidusController:
         self._session_count = 0
         self._monitors = self._get_monitors()
         self._hotkeys_registered = False
-        self._start_tk_pump()
+        threading.Thread(target=self._run_tk_loop, daemon=True).start()
+        self._tk_ready.wait(timeout=5)
         self._register_hotkeys()
+        if self.debug:
+            self._emit_status(
+                "Modo debug",
+                "Atalhos globais podem falhar sem admin. Use os botões ou rode sem --debug.",
+            )
 
-    def _start_tk_pump(self):
-        def pump():
-            while True:
-                try:
-                    self._tk.update()
-                except tk.TclError:
-                    break
-                time.sleep(0.02)
+    def _run_tk_loop(self):
+        self._tk = tk.Tk()
+        self._tk.withdraw()
+        self._tk_ready.set()
+        self._poll_actions()
+        self._tk.mainloop()
 
-        threading.Thread(target=pump, daemon=True).start()
+    def _poll_actions(self):
+        while True:
+            try:
+                fn = self._actions.get_nowait()
+                fn()
+            except queue.Empty:
+                break
+            except Exception as exc:
+                self._emit_status("Erro", str(exc)[:120])
+        if self._tk:
+            self._tk.after(30, self._poll_actions)
+
+    def _dispatch(self, fn):
+        self._actions.put(fn)
 
     def attach_window(self, window):
         self.window = window
@@ -127,6 +146,21 @@ class NidusController:
             self.overlay.set_style(self.config.get("overlay_style", "transparent"))
 
     def select_region(self) -> dict:
+        done = threading.Event()
+
+        def work():
+            try:
+                self._select_region_ui()
+            finally:
+                done.set()
+
+        self._dispatch(work)
+        done.wait(timeout=120)
+        return {"ok": True}
+
+    def _select_region_ui(self):
+        if not self._tk:
+            return
         if self.window:
             try:
                 self.window.minimize()
@@ -145,7 +179,6 @@ class NidusController:
             save_config(self.app_dir, self.config)
             self._emit_state()
             self._emit_status("Região selecionada", self._region_label())
-        return {"ok": True}
 
     def toggle_overlay(self) -> dict:
         if not self.overlay:
@@ -238,13 +271,21 @@ class NidusController:
                 self._emit_status("Erro", str(exc)[:120])
         self._emit_state()
 
+    def _normalize_hotkey(self, hotkey: str) -> str:
+        hk = (hotkey or "").strip().lower()
+        if hk.startswith("mouse:"):
+            return hk
+        return hk
+
     def _register_hotkey(self, hotkey: str, callback):
-        if not hotkey or sys.platform != "win32":
+        hk = self._normalize_hotkey(hotkey)
+        if not hk or sys.platform != "win32":
             return
         try:
-            keyboard.add_hotkey(hotkey, callback)
-        except Exception:
-            pass
+            keyboard.add_hotkey(hk, callback, suppress=False)
+        except Exception as exc:
+            from src.debug_log import log
+            log(f"Hotkey '{hk}' não registrado: {exc}")
 
     def _register_hotkeys(self):
         if sys.platform != "win32":
@@ -256,15 +297,15 @@ class NidusController:
                 pass
         self._register_hotkey(
             self.config.get("hotkey_region", "f9"),
-            lambda: self._tk.after(0, self.select_region),
+            lambda: self._dispatch(self._select_region_ui),
         )
         self._register_hotkey(
             self.config.get("hotkey_translate", "f10"),
-            lambda: self._tk.after(0, self.translate_toggle),
+            lambda: self._dispatch(self.translate_toggle),
         )
         self._register_hotkey(
             self.config.get("hotkey_toggle", "f11"),
-            lambda: self._tk.after(0, self.toggle_overlay),
+            lambda: self._dispatch(self.toggle_overlay),
         )
         self._hotkeys_registered = True
 
