@@ -1,3 +1,4 @@
+import queue
 import sys
 import threading
 import tkinter as tk
@@ -18,7 +19,7 @@ class NidusController:
         self.version = version
         self.notify = notify
         self.debug = debug
-        self.window = None
+        self._webview = None
         self.config = load_config(app_dir)
         self.overlay = None
         self.translator = None
@@ -29,6 +30,11 @@ class NidusController:
         self._monitors = self._get_monitors()
         self._hotkeys_registered = False
         self._region_lock = threading.Lock()
+        self._tk_queue: queue.Queue = queue.Queue()
+        self._tk_ready = threading.Event()
+        self._tk_root = None
+        threading.Thread(target=self._tk_thread_main, daemon=True, name="nidus-tk").start()
+        self._tk_ready.wait(timeout=10)
         self._register_hotkeys()
         if self.debug:
             self._emit_status(
@@ -37,7 +43,59 @@ class NidusController:
             )
 
     def attach_window(self, window):
-        self.window = window
+        self._webview = window
+
+    def _tk_thread_main(self):
+        root = tk.Tk()
+        root.withdraw()
+        self._tk_root = root
+        self._tk_ready.set()
+
+        def pump():
+            while True:
+                try:
+                    task = self._tk_queue.get_nowait()
+                    task()
+                except queue.Empty:
+                    break
+            root.after(50, pump)
+
+        root.after(50, pump)
+        root.mainloop()
+
+    def _tk_call(self, fn, timeout=120):
+        done = threading.Event()
+        err = [None]
+
+        def wrapped():
+            try:
+                fn()
+            except Exception as exc:
+                err[0] = exc
+            finally:
+                done.set()
+
+        self._tk_queue.put(wrapped)
+        if not done.wait(timeout=timeout):
+            raise TimeoutError("Operação Tk expirou")
+        if err[0]:
+            raise err[0]
+
+    def _hide_webview(self):
+        if not self._webview:
+            return
+        try:
+            self._webview.minimize()
+        except Exception:
+            pass
+
+    def _show_webview(self):
+        if not self._webview:
+            return
+        try:
+            self._webview.restore()
+        except Exception:
+            pass
 
     def _get_monitors(self) -> list[dict]:
         with mss.mss() as sct:
@@ -118,41 +176,31 @@ class NidusController:
 
     def _select_region_standalone(self):
         with self._region_lock:
-            root = tk.Tk()
-            root.withdraw()
+            self._hide_webview()
             try:
                 self._emit_status("Selecione a região", "Arraste na tela. ESC cancela.")
                 mon = self._selected_monitor()
-                selector = RegionSelector(root, mon)
-                root.wait_window(selector)
-                if selector.result:
-                    self.config["region"] = selector.result
+                result = [None]
+
+                def pick():
+                    selector = RegionSelector(self._tk_root, mon)
+                    self._tk_root.wait_window(selector)
+                    result[0] = selector.result
+
+                self._tk_call(pick)
+                if result[0]:
+                    self.config["region"] = result[0]
                     save_config(self.app_dir, self.config)
                     self._emit_state()
                     self._emit_status("Região selecionada", self._region_label())
             except Exception as exc:
                 self._emit_status("Erro na região", str(exc)[:120])
             finally:
-                try:
-                    root.destroy()
-                except tk.TclError:
-                    pass
+                self._show_webview()
 
     def select_region(self) -> dict:
-        done = threading.Event()
-
-        def work():
-            try:
-                self._select_region_standalone()
-            finally:
-                done.set()
-
-        threading.Thread(target=work, daemon=True).start()
-        done.wait(timeout=120)
-        return {"ok": True}
-
-    def _hotkey_select_region(self):
         threading.Thread(target=self._select_region_standalone, daemon=True).start()
+        return {"ok": True}
 
     def toggle_overlay(self) -> dict:
         if not self.overlay:
@@ -271,7 +319,7 @@ class NidusController:
                 pass
         self._register_hotkey(
             self.config.get("hotkey_region", "f9"),
-            lambda: self._run_hotkey(self._hotkey_select_region),
+            lambda: self._run_hotkey(self._select_region_standalone),
         )
         self._register_hotkey(
             self.config.get("hotkey_translate", "f10"),

@@ -1,4 +1,3 @@
-import json
 import os
 import queue
 import sys
@@ -11,15 +10,11 @@ from src.ui.controller import NidusController
 
 class Api:
     def __init__(self, app_dir, version, debug=False):
-        self.app_dir = app_dir
-        self.version = version
-        self.window = None
         self._events: queue.Queue = queue.Queue()
-        self.controller = NidusController(app_dir, version, self.notify, debug=debug)
+        self._controller = NidusController(app_dir, version, self.notify, debug=debug)
 
     def attach(self, window):
-        self.window = window
-        self.controller.attach_window(window)
+        self._controller.attach_window(window)
 
     def notify(self, event, payload=None):
         self._events.put({"event": event, "payload": payload})
@@ -34,19 +29,19 @@ class Api:
         return items
 
     def get_state(self):
-        return self.controller.get_state()
+        return self._controller.get_state()
 
     def patch_config(self, patch):
-        return self.controller.patch_config(patch or {})
+        return self._controller.patch_config(patch or {})
 
     def select_region(self):
-        return self.controller.select_region()
+        return self._controller.select_region()
 
     def translate_toggle(self):
-        return self.controller.translate_toggle()
+        return self._controller.translate_toggle()
 
     def toggle_overlay(self):
-        return self.controller.toggle_overlay()
+        return self._controller.toggle_overlay()
 
     def open_url(self, url):
         webbrowser.open(url)
@@ -70,7 +65,7 @@ def launch(app_dir, version, debug=False):
         api.notify("state", api.get_state())
 
     def on_closing():
-        api.controller.shutdown()
+        api._controller.shutdown()
 
     window.events.closing += on_closing
     webview.start(boot, debug=debug, gui="edgechromium" if sys.platform == "win32" else None)
