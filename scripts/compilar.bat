@@ -9,7 +9,7 @@ echo   Compilando Nidus
 echo  ================================
 echo.
 
-pip install pyinstaller >nul 2>&1
+pip install -r requirements.txt pyinstaller >nul 2>&1
 
 echo  Convertendo icone...
 python scripts\build_icon.py
@@ -19,6 +19,8 @@ echo.
 
 set "EXTRA_DATA=--add-data assets\icon.png;assets --add-data assets\icon.ico;assets"
 if exist assets\code.jpeg set "EXTRA_DATA=%EXTRA_DATA% --add-data assets\code.jpeg;assets"
+REM UI web (pywebview) precisa ir dentro do exe
+set "EXTRA_DATA=%EXTRA_DATA% --add-data src\ui\web;src\ui\web"
 
 python -m PyInstaller --noconfirm --onefile --windowed ^
   --name "Nidus" ^
@@ -31,7 +33,12 @@ python -m PyInstaller --noconfirm --onefile --windowed ^
   --hidden-import anthropic ^
   --hidden-import keyboard ^
   --hidden-import mouse ^
-  --hidden-import customtkinter ^
+  --hidden-import webview ^
+  --hidden-import webview.platforms.edgechromium ^
+  --hidden-import bottle ^
+  --hidden-import proxy_tools ^
+  --hidden-import clr_loader ^
+  --hidden-import pythonnet ^
   --hidden-import src.capture ^
   --hidden-import src.translator ^
   --hidden-import src.overlay ^
@@ -46,9 +53,13 @@ python -m PyInstaller --noconfirm --onefile --windowed ^
   --hidden-import src.interview_buffer ^
   --hidden-import src.text_sanitize ^
   --hidden-import src.debug_log ^
+  --hidden-import src.ui.window ^
+  --hidden-import src.ui.controller ^
+  --hidden-import src.ui.config_store ^
+  --hidden-import src.ui.region_selector ^
   --hidden-import faster_whisper ^
   --hidden-import pyaudiowpatch ^
-  --collect-all customtkinter ^
+  --collect-all webview ^
   --collect-all mss ^
   --collect-all faster_whisper ^
   main.py
@@ -59,6 +70,10 @@ if exist "dist\Nidus.exe" (
     echo   Sucesso!
     echo   Arquivo: dist\Nidus.exe
     echo   Esse e o arquivo para distribuir.
+    echo.
+    echo   Requisito no PC do usuario:
+    echo   Microsoft Edge WebView2 Runtime
+    echo   ^(ja vem no Windows 10/11 atualizado^)
     echo  ================================
 ) else (
     echo  [ERRO] Compilacao falhou.
