@@ -119,4 +119,12 @@ $('#settings-save').onclick=async()=>{
   });
   $('#settings-modal').classList.remove('open');
 };
+
+setInterval(async()=>{
+  if(!api()) return;
+  try{
+    const events=await api().pull_events();
+    for(const e of events) window.nidusEvent(e.event,e.payload);
+  }catch(_){}
+}, 120);
 </script></body></html>

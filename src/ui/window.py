@@ -1,8 +1,7 @@
 import json
 import os
+import queue
 import sys
-import threading
-import time
 import webbrowser
 
 import webview
@@ -15,6 +14,7 @@ class Api:
         self.app_dir = app_dir
         self.version = version
         self.window = None
+        self._events: queue.Queue = queue.Queue()
         self.controller = NidusController(app_dir, version, self.notify, debug=debug)
 
     def attach(self, window):
@@ -22,14 +22,16 @@ class Api:
         self.controller.attach_window(window)
 
     def notify(self, event, payload=None):
-        if not self.window:
-            return
-        try:
-            self.window.evaluate_js(
-                "window.nidusEvent(%s,%s)" % (json.dumps(event), json.dumps(payload))
-            )
-        except Exception:
-            pass
+        self._events.put({"event": event, "payload": payload})
+
+    def pull_events(self):
+        items = []
+        while True:
+            try:
+                items.append(self._events.get_nowait())
+            except queue.Empty:
+                break
+        return items
 
     def get_state(self):
         return self.controller.get_state()
