@@ -16,10 +16,20 @@ DEFAULT_CONFIG = {
     "hotkey_translate": "f10",
     "hotkey_toggle": "f11",
     "hotkey_audio": "f12",
+    "audio_device": "",
     "audio_capture_mode": "system",
+    "audio_target_pid": 0,
     "whisper_model": "tiny",
+    "whisper_compute_device": "cpu",
     "audio_source_language": "auto",
+    "audio_streaming": True,
     "interview_context": "",
+    "interview_type": "Geral",
+    "interview_answer_language": "Português",
+    "interview_streaming": True,
+    "interview_capture_mode": "system",
+    "interview_target_pid": 0,
+    "interview_audio_device": "",
 }
 
 LANGUAGES = [
@@ -27,6 +37,19 @@ LANGUAGES = [
     "Italiano", "Coreano", "Chinês Simplificado", "Chinês Tradicional",
     "Russo",
 ]
+
+AUDIO_SOURCE_LANGS = [
+    "auto", "Inglês", "Japonês", "Espanhol", "Português", "Francês",
+    "Alemão", "Coreano", "Chinês", "Russo",
+]
+
+AUDIO_SOURCE_MAP = {
+    "auto": "auto",
+    "Inglês": "en", "Japonês": "ja", "Espanhol": "es", "Português": "pt",
+    "Francês": "fr", "Alemão": "de", "Coreano": "ko", "Chinês": "zh", "Russo": "ru",
+}
+
+INTERVIEW_TYPES = ["Geral", "Técnica", "Comportamental", "RH / Cultura"]
 
 
 def config_path(app_dir: str) -> str:

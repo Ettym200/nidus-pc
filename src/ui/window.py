@@ -43,6 +43,24 @@ class Api:
     def toggle_overlay(self):
         return self._controller.toggle_overlay()
 
+    def translate_text(self, text, target_language=None):
+        return self._controller.translate_text(text, target_language)
+
+    def uga_summarize(self, text="", images_b64=None):
+        return self._controller.uga_summarize(text, images_b64)
+
+    def list_audio_devices(self):
+        return self._controller.list_audio_devices()
+
+    def list_audio_apps(self):
+        return self._controller.list_audio_apps()
+
+    def audio_toggle(self):
+        return self._controller.audio_toggle()
+
+    def interview_toggle(self):
+        return self._controller.interview_toggle()
+
     def open_url(self, url):
         webbrowser.open(url)
 

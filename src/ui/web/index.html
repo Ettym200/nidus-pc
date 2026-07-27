@@ -1,22 +1,359 @@
-<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Nidus</title>
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nidus</title>
 <style>
-:root{--bg:#24211d;--s1:#302c27;--s2:#3b3630;--s3:#48413a;--line:#50483f;--text:#eee9df;--dim:#bcb4a8;--mute:#8c8378;--amber:#e5b85d;--red:#d46b54;--ok:#8ac28f;--r:10px}*{box-sizing:border-box}html,body{height:100%;margin:0;overflow:hidden}body{background:var(--bg);color:var(--text);font:350 16px/1.5 Segoe UI,system-ui,sans-serif}button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.app{height:100%;display:grid;grid-template-rows:52px 1fr}.title{display:flex;align-items:center;gap:16px;padding:0 20px;background:var(--s1);border-bottom:1px solid #3b352f}.title b{font-size:17px}.title small{color:var(--mute)}.spacer{flex:1}.pill,.quiet{border:1px solid var(--line);border-radius:6px;padding:8px 12px;color:var(--dim)}.pill{border-radius:99px;padding:5px 12px}.dot{width:6px;height:6px;border-radius:50%;display:inline-block;background:var(--ok);margin-right:7px}.body{display:grid;grid-template-columns:212px 1fr;min-height:0}.rail{padding:16px 12px;background:#292520;border-right:1px solid #3b352f}.label,.section{color:var(--mute);font-size:11px;text-transform:uppercase;letter-spacing:.1em;font-weight:600}.label{padding:0 12px 8px}.nav{display:flex;align-items:center;gap:12px;width:100%;height:40px;padding:0 12px;border-radius:6px;color:var(--dim);text-align:left}.nav:hover,.nav[aria-current=true]{background:var(--s2);color:var(--text)}.nav[aria-current=true] svg{color:var(--amber)}.foot{margin-top:auto;padding-top:40px}.foot button{display:flex;justify-content:center;align-items:center;gap:8px;width:100%;height:34px;color:var(--mute)}.update{border:1px solid var(--line);border-radius:6px;padding:12px;color:var(--dim);font-size:12px;margin-bottom:8px}.update b{display:block;color:var(--text);margin-bottom:3px}.update a{color:var(--amber)}.pane{display:grid;grid-template-rows:1fr auto;min-height:0}.pane[hidden]{display:none}.scroll{overflow:auto;padding:32px}.head{display:flex;justify-content:space-between;align-items:end;margin-bottom:24px}.head h1{font-size:22px;margin:0}.head p{color:var(--mute);font-size:14px;margin:4px 0 0}.ready{display:flex;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin:0 0 32px}.ready div{flex:1;padding:12px 16px;min-width:0}.ready div+div{border-left:1px solid var(--line)}dt{color:var(--mute);font-size:11px;text-transform:uppercase;letter-spacing:.08em}dd{margin:2px 0 0;font-size:15px}.muted{color:var(--mute);font-size:12px}.capture{display:grid;grid-template-columns:1.35fr 1fr;gap:24px;margin-bottom:32px}.monitor{position:relative;aspect-ratio:16/9;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:linear-gradient(#39342e 1px,transparent 1px) 0 0/100% 28px,linear-gradient(90deg,#39342e 1px,transparent 1px) 0 0/28px 100%,var(--s1)}.badge{position:absolute;top:10px;left:12px;color:var(--mute);font:11px monospace}.region{position:absolute;left:12%;top:66%;width:76%;height:22%;border:1px solid var(--amber);background:#6b542d55;border-radius:4px;display:grid;place-items:center;color:var(--amber);font:12px monospace}.stack{display:flex;flex-direction:column;gap:16px}.row{display:flex;align-items:center;justify-content:space-between;gap:16px}.row label{color:var(--dim);font-size:14px}.rule{height:1px;border:0;background:#3b352f;width:100%}.seg{display:flex;gap:2px;padding:3px;background:var(--s1);border-radius:6px}.seg button{padding:6px 13px;border-radius:5px;color:var(--dim);font-size:13px}.seg button[aria-pressed=true]{background:var(--s3);color:var(--text)}.keys{display:grid;grid-template-columns:1fr 1fr;gap:0 32px}.keys div{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid #3b352f;color:var(--dim);font-size:14px}.chip{border:1px solid var(--line);border-radius:5px;padding:3px 9px;background:var(--s1);font:12px monospace;color:var(--text)}.action{display:flex;align-items:center;gap:16px;padding:12px 20px;background:var(--s1);border-top:1px solid #3b352f}.status{flex:1;min-width:0}.status b{display:block;font-size:14px}.status small{display:block;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-style:italic}.primary{height:42px;padding:0 20px;border-radius:6px;background:var(--amber);color:#302516;font-weight:600}.primary:hover{background:#f0c977}.primary:disabled{background:var(--s2);color:var(--mute)}.textgrid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.box{border:1px solid var(--line);border-radius:var(--r);padding:16px;min-height:150px;background:#292520;color:var(--dim)}.drop{border:1px dashed var(--line);border-radius:var(--r);padding:48px;text-align:center;color:var(--dim)}.drop h3{color:var(--text);margin:8px}.drop p{font-size:14px}.livebox{border:1px solid var(--line);border-radius:var(--r);padding:24px;min-height:210px;background:#1f1c19;color:var(--dim)}.modal{position:fixed;inset:0;background:#000000aa;display:none;place-items:center;z-index:99;padding:20px}.modal.open{display:grid}.modal-box{width:min(520px,100%);background:var(--s1);border:1px solid var(--line);border-radius:var(--r);padding:24px;display:grid;gap:14px}.modal-box h2{margin:0 0 4px;font-size:18px}.field{display:grid;gap:6px}.field label{font-size:12px;color:var(--mute);text-transform:uppercase;letter-spacing:.06em}.field input,.field select{width:100%;padding:10px 12px;border-radius:6px;border:1px solid var(--line);background:var(--s2);color:var(--text);font:inherit}.modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:8px}
-@media(max-width:960px){.body{grid-template-columns:1fr;grid-template-rows:1fr auto}.rail{order:2;display:flex;padding:6px;border-right:0;border-top:1px solid #3b352f}.label,.foot{display:none}.nav{height:48px;justify-content:center;flex-direction:column;gap:2px;padding:4px;font-size:11px}.capture,.textgrid,.keys{grid-template-columns:1fr}.ready{flex-direction:column}.ready div+div{border-left:0;border-top:1px solid var(--line)}.scroll{padding:20px}.head{align-items:start;gap:16px;flex-direction:column}}
-</style></head><body><div class="app"><header class="title"><b>Nidus</b><small id="version">1.1.0</small><span class="spacer"></span><button class="pill"><span class="dot"></span><span id="provider">Sem chave configurada</span></button><button class="quiet" id="settings-btn">⚙</button></header><div class="body"><nav class="rail"><div class="label">Modos</div><button class="nav" aria-current="true" data-go="jogo">◈ Jogo</button><button class="nav" data-go="live">◉ Live</button><button class="nav" data-go="entrevista">◌ Entrevista</button><button class="nav" data-go="texto">文 Traduzir texto</button><button class="nav" data-go="uga">ϟ Uga Buga</button><div class="foot"><div class="update"><b>UI redesenhada</b>Rail lateral, ação fixa e configurações mais limpas.</div><button>♡ Apoiar via Pix</button><button>▱ Como usar</button></div></nav>
-<section class="pane" id="jogo"><div class="scroll"><div class="head"><div><h1>Tradução por tela</h1><p>Lê a região marcada e devolve a tradução num overlay sobre o jogo.</p></div><button class="quiet" id="region-btn">⌗ Selecionar região</button></div><dl class="ready"><div><dt>Provedor</dt><dd><span class="dot"></span><span id="r-provider">-</span> <span class="muted" id="r-key-status">sem chave</span></dd></div><div><dt>Traduzir para</dt><dd id="r-lang">Português</dd></div><div><dt>Monitor</dt><dd><span id="r-monitor-num">1</span> <span class="muted" id="r-monitor-size">1920 × 1080</span></dd></div><div><dt>Traduções na sessão</dt><dd id="r-sessions">0</dd></div></dl><div class="capture"><div class="monitor"><span class="badge" id="monitor-badge">MONITOR 1 · 1920×1080</span><div class="region" id="region-preview">Nenhuma região</div></div><div class="stack"><div class="row"><label>Modo</label><div class="seg" id="mode-seg"><button type="button" data-mode="once" aria-pressed="true">Uma vez</button><button type="button" data-mode="continuous" aria-pressed="false">Contínuo</button></div></div><hr class="rule"><div class="row"><label>Intervalo</label><input type="range" id="interval-range" min="0.5" max="5" step="0.5" value="1.5" style="width:160px"><span class="muted" id="interval-label">1.5s</span></div><hr class="rule"><div class="row"><label>Fundo do overlay</label><div class="seg" id="overlay-seg"><button type="button" data-style="transparent" aria-pressed="true">Aa</button><button type="button" data-style="semi" aria-pressed="false">Aa</button><button type="button" data-style="dark" aria-pressed="false">Aa</button></div></div></div></div><div class="section">Atalhos globais</div><div class="keys"><div><span>Selecionar região</span><kbd class="chip" id="hk-region">F9</kbd></div><div><span>Traduzir agora</span><kbd class="chip" id="hk-translate">F10</kbd></div><div><span>Mostrar / ocultar overlay</span><kbd class="chip" id="hk-toggle">F11</kbd></div><div><span>Tradução por áudio</span><kbd class="chip" id="hk-audio">F12</kbd></div></div></div><div class="action"><div class="status"><b><span class="dot"></span><span id="status-title">Pronto</span></b><small id="status-detail">Nenhuma tradução ainda</small></div><button class="quiet" id="save-btn">Salvar</button><button class="primary" id="run">▷ Traduzir agora <small>F10</small></button></div></section>
-<section class="pane" id="live" hidden><div class="scroll"><div class="head"><div><h1>Tradução por áudio</h1><p>Captura o som do sistema ou de um app e legenda em tempo real.</p></div></div><div class="livebox">As legendas aparecem aqui quando você iniciar.</div></div><div class="action"><div class="status"><b><span class="dot"></span>Parado</b><small>Whisper tiny · cpu</small></div><button class="primary">▷ Iniciar <small>F12</small></button></div></section>
-<section class="pane" id="entrevista" hidden><div class="scroll"><div class="head"><div><h1>Modo entrevista</h1><p>Ouve o entrevistador e sugere a resposta depois de uma pausa.</p></div></div><div class="drop"><h3>Seu perfil está vazio</h3><p>Sem cargo, stack e experiência, as respostas saem genéricas.</p><button class="primary">Preencher perfil</button></div></div><div class="action"><div class="status"><b>Perfil incompleto</b><small>Preencha o perfil para liberar o modo</small></div><button class="primary" disabled>▷ Iniciar</button></div></section>
-<section class="pane" id="texto" hidden><div class="scroll"><div class="head"><div><h1>Traduzir texto</h1><p>Cole qualquer coisa e traduza sem sair do app.</p></div></div><div class="textgrid"><div><div class="section">Original</div><div class="box" contenteditable="true">Cole o texto aqui</div></div><div><div class="section">Tradução</div><div class="box">A tradução aparece aqui</div></div></div></div><div class="action"><div class="status"><b>Pronto</b><small>0 caracteres</small></div><button class="quiet">Copiar</button><button class="primary">Traduzir</button></div></section>
-<section class="pane" id="uga" hidden><div class="scroll"><div class="head"><div><h1>Uga Buga</h1><p>Cola o textão da skill, sai o resumo que você realmente lê.</p></div></div><div class="drop"><h3>Solte prints aqui</h3><p>Ou cole com Ctrl + V. Vários de uma vez funciona.</p></div></div><div class="action"><div class="status"><b>Aguardando</b><small>Nada na fila</small></div><button class="primary" disabled>ϟ Gerar resumo</button></div></section>
-</div></div></div>
-<div class="modal" id="settings-modal"><div class="modal-box"><h2>Configurações</h2><div class="field"><label>API Key</label><input id="cfg-api-key" type="password" placeholder="sk-..."></div><div class="field"><label>Provedor</label><select id="cfg-provider"></select></div><div class="field"><label>Modelo (opcional)</label><input id="cfg-model" placeholder="padrão do provedor"></div><div class="field"><label>Base URL (custom)</label><input id="cfg-base-url" placeholder="http://localhost:11434/v1"></div><div class="field"><label>Traduzir para</label><select id="cfg-lang"></select></div><div class="field"><label>Monitor</label><select id="cfg-monitor"></select></div><div class="modal-actions"><button class="quiet" id="settings-cancel">Cancelar</button><button class="primary" id="settings-save">Salvar</button></div></div></div>
+:root{--bg:#24211d;--s1:#302c27;--s2:#3b3630;--s3:#48413a;--line:#50483f;--text:#eee9df;--dim:#bcb4a8;--mute:#8c8378;--amber:#e5b85d;--red:#d46b54;--ok:#8ac28f;--r:10px}
+*{box-sizing:border-box}html,body{height:100%;margin:0;overflow:hidden}
+body{background:var(--bg);color:var(--text);font:350 16px/1.5 Segoe UI,system-ui,sans-serif}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+textarea,input,select{font:inherit;color:var(--text);background:var(--s2);border:1px solid var(--line);border-radius:6px;padding:10px 12px;width:100%}
+textarea{resize:vertical;min-height:120px}
+.app{height:100%;display:grid;grid-template-rows:52px 1fr}
+.title{display:flex;align-items:center;gap:16px;padding:0 20px;background:var(--s1);border-bottom:1px solid #3b352f}
+.title b{font-size:17px}.title small{color:var(--mute)}.spacer{flex:1}
+.pill,.quiet{border:1px solid var(--line);border-radius:6px;padding:8px 12px;color:var(--dim)}
+.pill{border-radius:99px;padding:5px 12px}
+.dot{width:6px;height:6px;border-radius:50%;display:inline-block;background:var(--ok);margin-right:7px}
+.body{display:grid;grid-template-columns:212px 1fr;min-height:0}
+.rail{padding:16px 12px;background:#292520;border-right:1px solid #3b352f;display:flex;flex-direction:column}
+.label,.section{color:var(--mute);font-size:11px;text-transform:uppercase;letter-spacing:.1em;font-weight:600}
+.label{padding:0 12px 8px}
+.nav{display:flex;align-items:center;gap:12px;width:100%;height:40px;padding:0 12px;border-radius:6px;color:var(--dim);text-align:left}
+.nav:hover,.nav[aria-current=true]{background:var(--s2);color:var(--text)}
+.nav[aria-current=true]{color:var(--amber)}
+.foot{margin-top:auto;padding-top:40px}
+.foot button{display:flex;justify-content:center;align-items:center;gap:8px;width:100%;height:34px;color:var(--mute)}
+.update{border:1px solid var(--line);border-radius:6px;padding:12px;color:var(--dim);font-size:12px;margin-bottom:8px}
+.update b{display:block;color:var(--text);margin-bottom:3px}
+.pane{display:grid;grid-template-rows:1fr auto;min-height:0}
+.pane[hidden]{display:none}
+.scroll{overflow:auto;padding:32px}
+.head{display:flex;justify-content:space-between;align-items:end;margin-bottom:24px;gap:16px}
+.head h1{font-size:22px;margin:0}.head p{color:var(--mute);font-size:14px;margin:4px 0 0}
+.ready{display:flex;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin:0 0 32px}
+.ready div{flex:1;padding:12px 16px;min-width:0}.ready div+div{border-left:1px solid var(--line)}
+dt{color:var(--mute);font-size:11px;text-transform:uppercase;letter-spacing:.08em}
+dd{margin:2px 0 0;font-size:15px}.muted{color:var(--mute);font-size:12px}
+.capture{display:grid;grid-template-columns:1.35fr 1fr;gap:24px;margin-bottom:32px}
+.monitor{position:relative;aspect-ratio:16/9;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:linear-gradient(#39342e 1px,transparent 1px) 0 0/100% 28px,linear-gradient(90deg,#39342e 1px,transparent 1px) 0 0/28px 100%,var(--s1)}
+.badge{position:absolute;top:10px;left:12px;color:var(--mute);font:11px monospace}
+.region{position:absolute;left:12%;top:66%;width:76%;height:22%;border:1px solid var(--amber);background:#6b542d55;border-radius:4px;display:grid;place-items:center;color:var(--amber);font:12px monospace}
+.stack{display:flex;flex-direction:column;gap:16px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.row label{color:var(--dim);font-size:14px}
+.rule{height:1px;border:0;background:#3b352f;width:100%}
+.seg{display:flex;gap:2px;padding:3px;background:var(--s1);border-radius:6px;flex-wrap:wrap}
+.seg button{padding:6px 13px;border-radius:5px;color:var(--dim);font-size:13px}
+.seg button[aria-pressed=true]{background:var(--s3);color:var(--text)}
+.keys{display:grid;grid-template-columns:1fr 1fr;gap:0 32px}
+.keys div{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid #3b352f;color:var(--dim);font-size:14px}
+.chip{border:1px solid var(--line);border-radius:5px;padding:3px 9px;background:var(--s1);font:12px monospace;color:var(--text)}
+.action{display:flex;align-items:center;gap:16px;padding:12px 20px;background:var(--s1);border-top:1px solid #3b352f}
+.status{flex:1;min-width:0}.status b{display:block;font-size:14px}
+.status small{display:block;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-style:italic}
+.primary{height:42px;padding:0 20px;border-radius:6px;background:var(--amber);color:#302516;font-weight:600}
+.primary:hover{background:#f0c977}.primary:disabled{background:var(--s2);color:var(--mute);cursor:not-allowed}
+.formgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px 20px;margin-bottom:20px}
+.field{display:grid;gap:6px}.field label{font-size:12px;color:var(--mute);text-transform:uppercase;letter-spacing:.06em}
+.check{display:flex;align-items:center;gap:8px;color:var(--dim);font-size:14px}
+.check input{width:auto}
+.textgrid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.box{border:1px solid var(--line);border-radius:var(--r);padding:16px;min-height:180px;background:#292520;color:var(--dim);outline:none;white-space:pre-wrap}
+.box[contenteditable=true]:empty:before{content:attr(data-ph);color:var(--mute)}
+.livebox,.qabox{border:1px solid var(--line);border-radius:var(--r);padding:16px;min-height:120px;background:#1f1c19;color:var(--dim);white-space:pre-wrap}
+.qabox{min-height:100px}
+.drop{border:1px dashed var(--line);border-radius:var(--r);padding:28px;text-align:center;color:var(--dim);cursor:pointer}
+.drop.drag{border-color:var(--amber);background:#6b542d22}
+.drop h3{color:var(--text);margin:8px}.drop p{font-size:14px;margin:0}
+.thumbs{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}
+.thumbs .thumb{position:relative;width:88px;height:88px;border-radius:8px;overflow:hidden;border:1px solid var(--line)}
+.thumbs img{width:100%;height:100%;object-fit:cover}
+.thumbs button{position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;background:#000a;color:#fff;font-size:12px}
+.modal{position:fixed;inset:0;background:#000000aa;display:none;place-items:center;z-index:99;padding:20px}
+.modal.open{display:grid}
+.modal-box{width:min(520px,100%);background:var(--s1);border:1px solid var(--line);border-radius:var(--r);padding:24px;display:grid;gap:14px}
+.modal-box h2{margin:0 0 4px;font-size:18px}
+.modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:8px}
+.history{display:grid;gap:8px;margin-top:16px}
+.history div{border:1px solid #3b352f;border-radius:8px;padding:10px 12px;font-size:13px;color:var(--dim)}
+@media(max-width:960px){
+  .body{grid-template-columns:1fr;grid-template-rows:1fr auto}
+  .rail{order:2;display:flex;flex-direction:row;padding:6px;border-right:0;border-top:1px solid #3b352f}
+  .label,.foot{display:none}
+  .nav{height:48px;justify-content:center;flex-direction:column;gap:2px;padding:4px;font-size:11px}
+  .capture,.textgrid,.keys,.formgrid{grid-template-columns:1fr}
+  .ready{flex-direction:column}.ready div+div{border-left:0;border-top:1px solid var(--line)}
+  .scroll{padding:20px}.head{align-items:start;flex-direction:column}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="title">
+    <b>Nidus</b><small id="version">1.1.0</small>
+    <span class="spacer"></span>
+    <button class="pill"><span class="dot"></span><span id="provider">Sem chave configurada</span></button>
+    <button class="quiet" id="settings-btn">⚙</button>
+  </header>
+  <div class="body">
+    <nav class="rail">
+      <div class="label">Modos</div>
+      <button class="nav" aria-current="true" data-go="jogo">◈ Jogo</button>
+      <button class="nav" data-go="live">◉ Live</button>
+      <button class="nav" data-go="entrevista">◌ Entrevista</button>
+      <button class="nav" data-go="texto">文 Traduzir texto</button>
+      <button class="nav" data-go="uga">ϟ Uga Buga</button>
+      <div class="foot">
+        <div class="update"><b>UI redesenhada</b>Rail lateral, ação fixa e configurações mais limpas.</div>
+      </div>
+    </nav>
+
+    <!-- JOGO -->
+    <section class="pane" id="jogo">
+      <div class="scroll">
+        <div class="head">
+          <div><h1>Tradução por tela</h1><p>Lê a região marcada e devolve a tradução num overlay sobre o jogo.</p></div>
+          <button class="quiet" id="region-btn">⌗ Selecionar região</button>
+        </div>
+        <dl class="ready">
+          <div><dt>Provedor</dt><dd><span class="dot"></span><span id="r-provider">-</span> <span class="muted" id="r-key-status">sem chave</span></dd></div>
+          <div><dt>Traduzir para</dt><dd id="r-lang">Português</dd></div>
+          <div><dt>Monitor</dt><dd><span id="r-monitor-num">1</span> <span class="muted" id="r-monitor-size">1920 × 1080</span></dd></div>
+          <div><dt>Traduções na sessão</dt><dd id="r-sessions">0</dd></div>
+        </dl>
+        <div class="capture">
+          <div class="monitor">
+            <span class="badge" id="monitor-badge">MONITOR 1 · 1920×1080</span>
+            <div class="region" id="region-preview">Nenhuma região</div>
+          </div>
+          <div class="stack">
+            <div class="row"><label>Modo</label>
+              <div class="seg" id="mode-seg">
+                <button type="button" data-mode="once" aria-pressed="true">Uma vez</button>
+                <button type="button" data-mode="continuous" aria-pressed="false">Contínuo</button>
+              </div>
+            </div>
+            <hr class="rule">
+            <div class="row"><label>Intervalo</label>
+              <input type="range" id="interval-range" min="0.5" max="5" step="0.5" value="1.5" style="width:160px">
+              <span class="muted" id="interval-label">1.5s</span>
+            </div>
+            <hr class="rule">
+            <div class="row"><label>Fundo do overlay</label>
+              <div class="seg" id="overlay-seg">
+                <button type="button" data-style="transparent" aria-pressed="true">Aa</button>
+                <button type="button" data-style="semi" aria-pressed="false">Aa</button>
+                <button type="button" data-style="dark" aria-pressed="false">Aa</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="section">Atalhos globais</div>
+        <div class="keys">
+          <div><span>Selecionar região</span><kbd class="chip" id="hk-region">F9</kbd></div>
+          <div><span>Traduzir agora</span><kbd class="chip" id="hk-translate">F10</kbd></div>
+          <div><span>Mostrar / ocultar overlay</span><kbd class="chip" id="hk-toggle">F11</kbd></div>
+          <div><span>Tradução por áudio</span><kbd class="chip" id="hk-audio">F12</kbd></div>
+        </div>
+      </div>
+      <div class="action">
+        <div class="status"><b><span class="dot"></span><span id="status-title">Pronto</span></b><small id="status-detail">Nenhuma tradução ainda</small></div>
+        <button class="quiet" id="save-btn">Salvar</button>
+        <button class="primary" id="run">▷ Traduzir agora <small>F10</small></button>
+      </div>
+    </section>
+
+    <!-- LIVE -->
+    <section class="pane" id="live" hidden>
+      <div class="scroll">
+        <div class="head">
+          <div><h1>Tradução por áudio</h1><p>Captura o som do sistema ou de um app e legenda em tempo real.</p></div>
+        </div>
+        <div class="formgrid">
+          <div class="field"><label>Captura</label>
+            <select id="live-capture-mode"></select>
+          </div>
+          <div class="field"><label>Dispositivo</label>
+            <select id="live-device"></select>
+          </div>
+          <div class="field" id="live-app-field" hidden><label>Aplicativo</label>
+            <div class="row" style="gap:8px">
+              <select id="live-app" style="flex:1"></select>
+              <button class="quiet" id="live-refresh-apps" type="button">↻</button>
+            </div>
+          </div>
+          <div class="field"><label>Idioma ouvido</label>
+            <select id="live-source-lang"></select>
+          </div>
+          <div class="field"><label>Traduzir para</label>
+            <select id="live-target-lang"></select>
+          </div>
+          <div class="field"><label>Whisper</label>
+            <select id="live-whisper"></select>
+          </div>
+          <div class="field"><label>Processamento</label>
+            <select id="live-compute"></select>
+          </div>
+          <div class="field"><label>&nbsp;</label>
+            <label class="check"><input type="checkbox" id="live-streaming" checked> Streaming</label>
+          </div>
+        </div>
+        <div class="section">Ouvido</div>
+        <div class="livebox" id="live-original">Aguardando áudio...</div>
+        <div class="section" style="margin-top:16px">Tradução</div>
+        <div class="livebox" id="live-translation">As legendas aparecem aqui.</div>
+      </div>
+      <div class="action">
+        <div class="status"><b><span class="dot"></span><span id="live-status-title">Parado</span></b><small id="live-status-detail">Whisper · cpu</small></div>
+        <button class="quiet" id="live-save">Salvar</button>
+        <button class="primary" id="live-run">▷ Iniciar <small>F12</small></button>
+      </div>
+    </section>
+
+    <!-- ENTREVISTA -->
+    <section class="pane" id="entrevista" hidden>
+      <div class="scroll">
+        <div class="head">
+          <div><h1>Modo entrevista</h1><p>Ouve o entrevistador e sugere a resposta depois de uma pausa.</p></div>
+        </div>
+        <div class="field" style="margin-bottom:16px">
+          <label>Seu perfil (cargo, stack, experiência)</label>
+          <textarea id="iv-context" rows="4" placeholder="Ex.: Dev backend Python, 5 anos, FastAPI, PostgreSQL..."></textarea>
+        </div>
+        <div class="formgrid">
+          <div class="field"><label>Tipo</label><select id="iv-type"></select></div>
+          <div class="field"><label>Responder em</label><select id="iv-answer-lang"></select></div>
+          <div class="field"><label>Captura</label><select id="iv-capture-mode"></select></div>
+          <div class="field"><label>Dispositivo</label><select id="iv-device"></select></div>
+          <div class="field" id="iv-app-field" hidden><label>Aplicativo</label>
+            <div class="row" style="gap:8px">
+              <select id="iv-app" style="flex:1"></select>
+              <button class="quiet" id="iv-refresh-apps" type="button">↻</button>
+            </div>
+          </div>
+          <div class="field"><label>Whisper</label><select id="iv-whisper"></select></div>
+          <div class="field"><label>&nbsp;</label>
+            <label class="check"><input type="checkbox" id="iv-streaming" checked> Streaming</label>
+          </div>
+        </div>
+        <div class="textgrid">
+          <div>
+            <div class="section">Pergunta</div>
+            <div class="qabox" id="iv-question">Aguardando pergunta...</div>
+          </div>
+          <div>
+            <div class="section">Sugestão de resposta</div>
+            <div class="qabox" id="iv-answer">A resposta aparece aqui.</div>
+          </div>
+        </div>
+        <div class="history" id="iv-history"></div>
+      </div>
+      <div class="action">
+        <div class="status"><b><span id="iv-status-title">Pronto</span></b><small id="iv-status-detail">Preencha o perfil para respostas melhores</small></div>
+        <button class="quiet" id="iv-copy">Copiar resposta</button>
+        <button class="quiet" id="iv-save">Salvar</button>
+        <button class="primary" id="iv-run">▷ Iniciar</button>
+      </div>
+    </section>
+
+    <!-- TEXTO -->
+    <section class="pane" id="texto" hidden>
+      <div class="scroll">
+        <div class="head">
+          <div><h1>Traduzir texto</h1><p>Cole qualquer coisa e traduza sem sair do app.</p></div>
+          <div class="field" style="min-width:180px"><label>Traduzir para</label><select id="text-lang"></select></div>
+        </div>
+        <div class="textgrid">
+          <div>
+            <div class="section">Original</div>
+            <div class="box" id="text-in" contenteditable="true" data-ph="Cole o texto aqui"></div>
+          </div>
+          <div>
+            <div class="section">Tradução</div>
+            <div class="box" id="text-out">A tradução aparece aqui</div>
+          </div>
+        </div>
+      </div>
+      <div class="action">
+        <div class="status"><b><span id="text-status-title">Pronto</span></b><small id="text-status-detail">0 caracteres</small></div>
+        <button class="quiet" id="text-clear">Limpar</button>
+        <button class="quiet" id="text-copy">Copiar</button>
+        <button class="primary" id="text-run">Traduzir</button>
+      </div>
+    </section>
+
+    <!-- UGA -->
+    <section class="pane" id="uga" hidden>
+      <div class="scroll">
+        <div class="head">
+          <div><h1>Uga Buga</h1><p>Cola o textão da skill, sai o resumo que você realmente lê.</p></div>
+        </div>
+        <div class="field" style="margin-bottom:14px">
+          <label>Texto do item / skill (opcional)</label>
+          <textarea id="uga-text" rows="4" placeholder="Cole a descrição da skill ou item..."></textarea>
+        </div>
+        <div class="drop" id="uga-drop">
+          <h3>Solte prints aqui</h3>
+          <p>Ou cole com Ctrl + V / escolha arquivo. Vários de uma vez funciona.</p>
+          <div style="margin-top:12px;display:flex;gap:8px;justify-content:center">
+            <button class="quiet" id="uga-pick" type="button">Abrir imagem</button>
+            <input type="file" id="uga-file" accept="image/*" multiple hidden>
+          </div>
+        </div>
+        <div class="thumbs" id="uga-thumbs"></div>
+        <div class="section" style="margin-top:8px">Resumo</div>
+        <div class="livebox" id="uga-out">O resumo uga buga aparece aqui.</div>
+      </div>
+      <div class="action">
+        <div class="status"><b><span id="uga-status-title">Aguardando</span></b><small id="uga-status-detail">Nada na fila</small></div>
+        <button class="quiet" id="uga-clear">Limpar</button>
+        <button class="quiet" id="uga-copy">Copiar</button>
+        <button class="primary" id="uga-run" disabled>ϟ Gerar resumo</button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div class="modal" id="settings-modal">
+  <div class="modal-box">
+    <h2>Configurações</h2>
+    <div class="field"><label>API Key</label><input id="cfg-api-key" type="password" placeholder="sk-..."></div>
+    <div class="field"><label>Provedor</label><select id="cfg-provider"></select></div>
+    <div class="field"><label>Modelo (opcional)</label><input id="cfg-model" placeholder="padrão do provedor"></div>
+    <div class="field"><label>Base URL (custom)</label><input id="cfg-base-url" placeholder="http://localhost:11434/v1"></div>
+    <div class="field"><label>Traduzir para</label><select id="cfg-lang"></select></div>
+    <div class="field"><label>Monitor</label><select id="cfg-monitor"></select></div>
+    <div class="modal-actions">
+      <button class="quiet" id="settings-cancel">Cancelar</button>
+      <button class="primary" id="settings-save">Salvar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const api=()=>window.pywebview&&window.pywebview.api;
 const $=s=>document.querySelector(s);
 let state=null;
+let ugaImages=[]; // {id, dataUrl}
+
+function fillSelect(sel, items, valueKey='id', labelKey='label'){
+  if(!sel) return;
+  const cur=sel.value;
+  sel.innerHTML='';
+  (items||[]).forEach(it=>{
+    const o=document.createElement('option');
+    if(typeof it==='string'){ o.value=it; o.textContent=it; }
+    else { o.value=it[valueKey]; o.textContent=it[labelKey]; }
+    sel.appendChild(o);
+  });
+  if(cur) sel.value=cur;
+}
 
 document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{
-  document.querySelectorAll('.nav').forEach(n=>n.setAttribute('aria-current',n===b));
+  document.querySelectorAll('.nav').forEach(n=>n.setAttribute('aria-current', n===b ? 'true' : 'false'));
   document.querySelectorAll('.pane').forEach(p=>p.hidden=p.id!==b.dataset.go);
 });
 
@@ -44,29 +381,119 @@ function applyGame(game,c){
   $('#interval-range').value=iv;
   $('#interval-label').textContent=`${iv}s`;
   const run=$('#run');
-  if(game.running){
-    run.textContent='■ Parar';
-  }else if((c.mode||'once')==='once'){
-    run.innerHTML='▷ Traduzir agora <small>F10</small>';
-  }else{
-    run.textContent='■ Parar tradução contínua';
+  if(game.running){ run.textContent='■ Parar'; }
+  else if((c.mode||'once')==='once'){ run.innerHTML='▷ Traduzir agora <small>F10</small>'; }
+  else { run.textContent='▷ Iniciar tradução contínua'; }
+}
+
+function applyLive(s){
+  const c=s.config||{};
+  const live=s.live||{};
+  fillSelect($('#live-capture-mode'), s.capture_modes||[{id:'system',label:'Todo o sistema'}]);
+  fillSelect($('#live-source-lang'), s.audio_source_langs||['auto']);
+  fillSelect($('#live-target-lang'), s.languages||[]);
+  fillSelect($('#live-whisper'), s.whisper_models||['tiny']);
+  fillSelect($('#live-compute'), s.compute_options||['cpu']);
+  $('#live-capture-mode').value=c.audio_capture_mode||'system';
+  $('#live-target-lang').value=c.target_language||'Português';
+  $('#live-whisper').value=c.whisper_model||'tiny';
+  $('#live-compute').value=c.whisper_compute_device||'cpu';
+  $('#live-streaming').checked=!!c.audio_streaming;
+  const srcCode=c.audio_source_language||'auto';
+  const srcLabel=Object.entries(s.audio_source_map||{}).find(([,v])=>v===srcCode)?.[0]||'auto';
+  $('#live-source-lang').value=srcLabel;
+  $('#live-app-field').hidden=($('#live-capture-mode').value!=='application');
+  const run=$('#live-run');
+  if(live.running){ run.textContent='■ Parar'; }
+  else { run.innerHTML='▷ Iniciar <small>F12</small>'; }
+  $('#live-status-detail').textContent=`${c.whisper_model||'tiny'} · ${c.whisper_compute_device||'cpu'}`;
+}
+
+function applyInterview(s){
+  const c=s.config||{};
+  const iv=s.interview||{};
+  fillSelect($('#iv-type'), s.interview_types||[]);
+  fillSelect($('#iv-answer-lang'), s.languages||[]);
+  fillSelect($('#iv-capture-mode'), s.capture_modes||[{id:'system',label:'Todo o sistema'}]);
+  fillSelect($('#iv-whisper'), s.whisper_models||['tiny']);
+  if(!$('#iv-context').matches(':focus')) $('#iv-context').value=c.interview_context||'';
+  $('#iv-type').value=c.interview_type||'Geral';
+  $('#iv-answer-lang').value=c.interview_answer_language||'Português';
+  $('#iv-capture-mode').value=c.interview_capture_mode||'system';
+  $('#iv-whisper').value=c.whisper_model||'tiny';
+  $('#iv-streaming').checked=!!c.interview_streaming;
+  $('#iv-app-field').hidden=($('#iv-capture-mode').value!=='application');
+  const run=$('#iv-run');
+  if(iv.running){ run.textContent='■ Parar'; }
+  else { run.textContent='▷ Iniciar'; }
+  if(iv.context_empty){
+    $('#iv-status-detail').textContent='Perfil vazio — respostas mais genéricas';
   }
+  const hist=$('#iv-history');
+  hist.innerHTML='';
+  (iv.history||[]).slice().reverse().forEach(h=>{
+    const d=document.createElement('div');
+    d.textContent=h.answer||'';
+    hist.appendChild(d);
+  });
+}
+
+function applyText(s){
+  fillSelect($('#text-lang'), s.languages||[]);
+  $('#text-lang').value=(s.config||{}).target_language||'Português';
+  $('#text-run').disabled=!!(s.text&&s.text.busy);
+}
+
+function applyUga(s){
+  updateUgaUi();
+  $('#uga-run').disabled=!!(s.uga&&s.uga.busy) || (!ugaImages.length && !($('#uga-text').value||'').trim());
 }
 
 function fillSettings(s){
   const c=s.config;
   $('#cfg-api-key').value=c.api_key||'';
-  const prov=$('#cfg-provider'); prov.innerHTML='';
-  (s.providers||[]).forEach(p=>{const o=document.createElement('option');o.value=p;o.textContent=p;prov.appendChild(o);});
-  prov.value=c.api_provider||'openrouter';
+  fillSelect($('#cfg-provider'), s.providers||[]);
+  $('#cfg-provider').value=c.api_provider||'openrouter';
   $('#cfg-model').value=c.model||'';
   $('#cfg-base-url').value=c.custom_base_url||'';
-  const lang=$('#cfg-lang'); lang.innerHTML='';
-  (s.languages||[]).forEach(l=>{const o=document.createElement('option');o.value=l;o.textContent=l;lang.appendChild(o);});
-  lang.value=c.target_language||'Português';
+  fillSelect($('#cfg-lang'), s.languages||[]);
+  $('#cfg-lang').value=c.target_language||'Português';
   const mon=$('#cfg-monitor'); mon.innerHTML='';
-  (s.monitors||[]).forEach(m=>{const o=document.createElement('option');o.value=m.index;o.textContent=`Monitor ${m.index+1} (${m.width}×${m.height})`;mon.appendChild(o);});
+  (s.monitors||[]).forEach(m=>{
+    const o=document.createElement('option');
+    o.value=m.index; o.textContent=`Monitor ${m.index+1} (${m.width}×${m.height})`;
+    mon.appendChild(o);
+  });
   mon.value=String(c.monitor_index||0);
+}
+
+async function refreshDevices(){
+  if(!api()) return;
+  try{
+    const devices=await api().list_audio_devices();
+    const opts=['(Padrão do sistema)', ...(devices||[])];
+    fillSelect($('#live-device'), opts);
+    fillSelect($('#iv-device'), opts);
+    const c=state?.config||{};
+    $('#live-device').value=c.audio_device||'(Padrão do sistema)';
+    $('#iv-device').value=c.interview_audio_device||'(Padrão do sistema)';
+  }catch(_){}
+}
+
+async function refreshApps(which){
+  if(!api()) return;
+  try{
+    const apps=await api().list_audio_apps();
+    const items=[{id:'0',label:'(nenhum)'}].concat((apps||[]).map(a=>({id:String(a.pid),label:a.label})));
+    if(which==='live'||!which){
+      fillSelect($('#live-app'), items);
+      $('#live-app').value=String((state?.config?.audio_target_pid)||0);
+    }
+    if(which==='iv'||!which){
+      fillSelect($('#iv-app'), items);
+      $('#iv-app').value=String((state?.config?.interview_target_pid)||0);
+    }
+  }catch(_){}
 }
 
 window.nidusEvent=(event,payload)=>{
@@ -76,14 +503,53 @@ window.nidusEvent=(event,payload)=>{
     const c=payload.config;
     $('#provider').textContent=payload.game?.provider_label||(c.api_key?`${c.api_provider} · ${c.model||'padrão'}`:'Sem chave configurada');
     applyGame(payload.game,c);
+    applyLive(payload);
+    applyInterview(payload);
+    applyText(payload);
+    applyUga(payload);
     fillSettings(payload);
   }
   if(event==='status'){
     $('#status-title').textContent=payload.title||'';
     $('#status-detail').textContent=payload.detail||'';
   }
+  if(event==='live_status'){
+    $('#live-status-title').textContent=payload.title||'';
+    $('#live-status-detail').textContent=payload.detail||'';
+  }
+  if(event==='live_original'){
+    $('#live-original').textContent=payload.text||'';
+  }
+  if(event==='live_translation'){
+    $('#live-translation').textContent=payload.text||'';
+  }
+  if(event==='interview_status'){
+    $('#iv-status-title').textContent=payload.title||'';
+    $('#iv-status-detail').textContent=payload.detail||'';
+  }
+  if(event==='interview_question'){
+    $('#iv-question').textContent=payload.text||'';
+  }
+  if(event==='interview_answer'){
+    $('#iv-answer').textContent=payload.text||'';
+  }
+  if(event==='text_status'){
+    $('#text-status-title').textContent=payload.title||'';
+    $('#text-status-detail').textContent=payload.detail||'';
+  }
+  if(event==='text_result'){
+    $('#text-out').textContent=payload.text||'';
+  }
+  if(event==='uga_status'){
+    $('#uga-status-title').textContent=payload.title||'';
+    $('#uga-status-detail').textContent=payload.detail||'';
+  }
+  if(event==='uga_result'){
+    $('#uga-out').textContent=payload.text||'';
+  }
 };
 
+/* Game */
 $('#region-btn').onclick=()=>api()&&api().select_region();
 $('#run').onclick=()=>api()&&api().translate_toggle();
 $('#save-btn').onclick=async()=>{
@@ -94,7 +560,6 @@ $('#save-btn').onclick=async()=>{
     overlay_style:document.querySelector('#overlay-seg button[aria-pressed=true]')?.dataset.style||'transparent',
   });
 };
-
 document.querySelectorAll('#mode-seg button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('#mode-seg button').forEach(x=>x.setAttribute('aria-pressed','false'));
   b.setAttribute('aria-pressed','true');
@@ -105,6 +570,7 @@ document.querySelectorAll('#overlay-seg button').forEach(b=>b.onclick=()=>{
 });
 $('#interval-range').oninput=e=>{$('#interval-label').textContent=`${e.target.value}s`;};
 
+/* Settings */
 $('#settings-btn').onclick=()=>$('#settings-modal').classList.add('open');
 $('#settings-cancel').onclick=()=>$('#settings-modal').classList.remove('open');
 $('#settings-save').onclick=async()=>{
@@ -120,6 +586,164 @@ $('#settings-save').onclick=async()=>{
   $('#settings-modal').classList.remove('open');
 };
 
+/* Live */
+$('#live-capture-mode').onchange=()=>{
+  $('#live-app-field').hidden=$('#live-capture-mode').value!=='application';
+  if($('#live-capture-mode').value==='application') refreshApps('live');
+};
+$('#live-refresh-apps').onclick=()=>refreshApps('live');
+$('#live-save').onclick=async()=>{
+  if(!api())return;
+  const map=state?.audio_source_map||{};
+  const device=$('#live-device').value;
+  await api().patch_config({
+    audio_capture_mode:$('#live-capture-mode').value,
+    audio_device:device==='(Padrão do sistema)'?'':device,
+    audio_target_pid:parseInt($('#live-app').value||'0',10),
+    audio_source_language:map[$('#live-source-lang').value]||'auto',
+    target_language:$('#live-target-lang').value,
+    whisper_model:$('#live-whisper').value,
+    whisper_compute_device:$('#live-compute').value,
+    audio_streaming:$('#live-streaming').checked,
+  });
+};
+$('#live-run').onclick=async()=>{
+  if(!api())return;
+  await $('#live-save').onclick();
+  await api().audio_toggle();
+};
+
+/* Interview */
+$('#iv-capture-mode').onchange=()=>{
+  $('#iv-app-field').hidden=$('#iv-capture-mode').value!=='application';
+  if($('#iv-capture-mode').value==='application') refreshApps('iv');
+};
+$('#iv-refresh-apps').onclick=()=>refreshApps('iv');
+$('#iv-save').onclick=async()=>{
+  if(!api())return;
+  const device=$('#iv-device').value;
+  await api().patch_config({
+    interview_context:$('#iv-context').value.trim(),
+    interview_type:$('#iv-type').value,
+    interview_answer_language:$('#iv-answer-lang').value,
+    interview_capture_mode:$('#iv-capture-mode').value,
+    interview_audio_device:device==='(Padrão do sistema)'?'':device,
+    interview_target_pid:parseInt($('#iv-app').value||'0',10),
+    interview_streaming:$('#iv-streaming').checked,
+    whisper_model:$('#iv-whisper').value,
+  });
+};
+$('#iv-run').onclick=async()=>{
+  if(!api())return;
+  await $('#iv-save').onclick();
+  await api().interview_toggle();
+};
+$('#iv-copy').onclick=async()=>{
+  const t=$('#iv-answer').textContent||'';
+  try{ await navigator.clipboard.writeText(t); }catch(_){}
+};
+
+/* Text */
+$('#text-in').oninput=()=>{
+  const n=($('#text-in').innerText||'').trim().length;
+  $('#text-status-detail').textContent=`${n} caracteres`;
+};
+$('#text-run').onclick=async()=>{
+  if(!api())return;
+  const text=($('#text-in').innerText||'').trim();
+  const res=await api().translate_text(text, $('#text-lang').value);
+  if(res&&res.error){
+    $('#text-status-title').textContent='Erro';
+    $('#text-status-detail').textContent=res.error;
+  }
+};
+$('#text-clear').onclick=()=>{
+  $('#text-in').innerHTML='';
+  $('#text-out').textContent='A tradução aparece aqui';
+  $('#text-status-detail').textContent='0 caracteres';
+};
+$('#text-copy').onclick=async()=>{
+  try{ await navigator.clipboard.writeText($('#text-out').textContent||''); }catch(_){}
+};
+
+/* Uga */
+function updateUgaUi(){
+  const thumbs=$('#uga-thumbs');
+  thumbs.innerHTML='';
+  ugaImages.forEach(img=>{
+    const d=document.createElement('div');
+    d.className='thumb';
+    d.innerHTML=`<img src="${img.dataUrl}" alt=""><button type="button" data-id="${img.id}">×</button>`;
+    thumbs.appendChild(d);
+  });
+  thumbs.querySelectorAll('button').forEach(b=>b.onclick=()=>{
+    ugaImages=ugaImages.filter(x=>x.id!==b.dataset.id);
+    updateUgaUi();
+  });
+  const has=ugaImages.length || ($('#uga-text').value||'').trim();
+  $('#uga-run').disabled=!has || !!(state?.uga?.busy);
+  $('#uga-status-detail').textContent=ugaImages.length?`${ugaImages.length} imagem(ns)`:(($('#uga-text').value||'').trim()?'Só texto':'Nada na fila');
+}
+
+function addImageDataUrl(dataUrl){
+  ugaImages.push({id:String(Date.now())+Math.random().toString(16).slice(2), dataUrl});
+  updateUgaUi();
+}
+
+function readFileAsDataUrl(file){
+  return new Promise((resolve,reject)=>{
+    const r=new FileReader();
+    r.onload=()=>resolve(r.result);
+    r.onerror=reject;
+    r.readAsDataURL(file);
+  });
+}
+
+$('#uga-text').oninput=updateUgaUi;
+$('#uga-pick').onclick=()=>$('#uga-file').click();
+$('#uga-file').onchange=async e=>{
+  for(const f of [...(e.target.files||[])]){
+    if(f.type.startsWith('image/')) addImageDataUrl(await readFileAsDataUrl(f));
+  }
+  e.target.value='';
+};
+const drop=$('#uga-drop');
+drop.ondragover=e=>{e.preventDefault(); drop.classList.add('drag');};
+drop.ondragleave=()=>drop.classList.remove('drag');
+drop.ondrop=async e=>{
+  e.preventDefault(); drop.classList.remove('drag');
+  for(const f of [...(e.dataTransfer.files||[])]){
+    if(f.type.startsWith('image/')) addImageDataUrl(await readFileAsDataUrl(f));
+  }
+};
+document.addEventListener('paste', async e=>{
+  if($('#uga').hidden) return;
+  const items=[...(e.clipboardData?.items||[])];
+  for(const it of items){
+    if(it.type.startsWith('image/')){
+      const f=it.getAsFile();
+      if(f) addImageDataUrl(await readFileAsDataUrl(f));
+    }
+  }
+});
+$('#uga-clear').onclick=()=>{
+  ugaImages=[];
+  $('#uga-text').value='';
+  $('#uga-out').textContent='O resumo uga buga aparece aqui.';
+  updateUgaUi();
+};
+$('#uga-copy').onclick=async()=>{
+  try{ await navigator.clipboard.writeText($('#uga-out').textContent||''); }catch(_){}
+};
+$('#uga-run').onclick=async()=>{
+  if(!api())return;
+  const res=await api().uga_summarize($('#uga-text').value||'', ugaImages.map(i=>i.dataUrl));
+  if(res&&res.error){
+    $('#uga-status-title').textContent='Erro';
+    $('#uga-status-detail').textContent=res.error;
+  }
+};
+
 setInterval(async()=>{
   if(!api()) return;
   try{
@@ -127,4 +751,11 @@ setInterval(async()=>{
     for(const e of events) window.nidusEvent(e.event,e.payload);
   }catch(_){}
 }, 120);
-</script></body></html>
+
+window.addEventListener('pywebviewready', ()=>{
+  refreshDevices();
+  refreshApps();
+});
+</script>
+</body>
+</html>
