@@ -1,7 +1,9 @@
 import base64
 import io
+import os
 import queue
 import sys
+import tempfile
 import threading
 import traceback
 import tkinter as tk
@@ -14,7 +16,7 @@ from src.audio_pipeline import AudioPipeline
 from src.capture import ScreenCapture
 from src.debug_log import log
 from src.overlay import OVERLAY_STYLE_OPTIONS, Overlay
-from src.speech_to_text import COMPUTE_OPTIONS, WHISPER_MODELS
+from src.speech_to_text import COMPUTE_OPTIONS, WHISPER_MODELS, SpeechToText
 from src.translator import KNOWN_PROVIDERS, Translator
 from src.ui.config_store import (
     AUDIO_SOURCE_LANGS,
@@ -25,6 +27,9 @@ from src.ui.config_store import (
     save_config,
 )
 from src.ui.region_selector import RegionSelector
+
+AUDIO_FILE_EXTS = {".mp3", ".ogg", ".opus", ".wav", ".m4a", ".webm", ".mp4", ".aac", ".flac"}
+MAX_AUDIO_FILE_BYTES = 40 * 1024 * 1024
 
 try:
     from src.audio_capture import list_output_devices
@@ -71,6 +76,8 @@ class NidusController:
         self._interview_history: list[dict] = []
         self._text_busy = False
         self._uga_busy = False
+        self._file_stt_busy = False
+        self._file_stt = None
 
         threading.Thread(target=self._tk_thread_main, daemon=True, name="nidus-tk").start()
         self._tk_ready.wait(timeout=10)
@@ -216,6 +223,7 @@ class NidusController:
             },
             "text": {"busy": self._text_busy},
             "uga": {"busy": self._uga_busy},
+            "file_stt": {"busy": self._file_stt_busy},
         }
 
     def patch_config(self, patch: dict) -> dict:
@@ -392,6 +400,120 @@ class NidusController:
                 self.notify("text_status", {"title": "Erro", "detail": str(exc)[:120]})
             finally:
                 self._text_busy = False
+                self._emit_state()
+
+        threading.Thread(target=work, daemon=True).start()
+        return {"ok": True}
+
+    # ── File transcription (WhatsApp mp3/ogg etc.) ─────────────────────
+
+    def _audio_ext(self, filename: str) -> str:
+        name = (filename or "").strip().lower()
+        _, ext = os.path.splitext(name)
+        if ext in AUDIO_FILE_EXTS:
+            return ext
+        return ".ogg"
+
+    def transcribe_audio_file(
+        self,
+        filename: str = "",
+        data_b64: str = "",
+        source_language: str | None = None,
+        also_translate: bool = False,
+        target_language: str | None = None,
+    ) -> dict:
+        if self._file_stt_busy:
+            return {"ok": False, "error": "Já transcrevendo outro áudio..."}
+        raw = data_b64 or ""
+        if "," in raw and raw.strip().startswith("data:"):
+            raw = raw.split(",", 1)[1]
+        if not raw:
+            return {"ok": False, "error": "Envie um áudio (mp3, ogg, opus...)."}
+        try:
+            payload = base64.b64decode(raw)
+        except Exception:
+            return {"ok": False, "error": "Arquivo de áudio inválido."}
+        if not payload:
+            return {"ok": False, "error": "Arquivo vazio."}
+        if len(payload) > MAX_AUDIO_FILE_BYTES:
+            return {"ok": False, "error": "Áudio muito grande (máx. 40 MB)."}
+
+        src = source_language
+        if not src or src == "auto":
+            src = "auto"
+        elif src in AUDIO_SOURCE_MAP:
+            src = AUDIO_SOURCE_MAP[src]
+        lang_out = target_language or self.config.get("target_language", "Português")
+
+        self._file_stt_busy = True
+        self._emit_state()
+        self.notify(
+            "file_stt_status",
+            {"title": "Transcrevendo...", "detail": filename or "áudio"},
+        )
+
+        def work():
+            tmp_path = None
+            try:
+                ext = self._audio_ext(filename)
+                fd, tmp_path = tempfile.mkstemp(suffix=ext, prefix="nidus_stt_")
+                os.close(fd)
+                with open(tmp_path, "wb") as f:
+                    f.write(payload)
+
+                stt = SpeechToText(
+                    model_size=self.config.get("whisper_model", "tiny"),
+                    device=self.config.get("whisper_compute_device", "cpu"),
+                    language=src,
+                )
+                self._file_stt = stt
+                text = stt.transcribe_file(tmp_path)
+                if not text:
+                    self.notify(
+                        "file_stt_status",
+                        {"title": "Sem fala detectada", "detail": filename or ""},
+                    )
+                    self.notify("file_stt_result", {"text": "", "translation": ""})
+                    return
+
+                translation = ""
+                if also_translate:
+                    if not self.config.get("api_key"):
+                        self.notify(
+                            "file_stt_status",
+                            {
+                                "title": "Transcrito (sem traduzir)",
+                                "detail": "Configure a API Key para traduzir.",
+                            },
+                        )
+                    else:
+                        self.notify(
+                            "file_stt_status",
+                            {"title": "Traduzindo...", "detail": lang_out},
+                        )
+                        translation = self._make_translator(lang_out).translate_text(
+                            text, target_language=lang_out
+                        )
+
+                self.notify(
+                    "file_stt_result",
+                    {"text": text, "translation": translation or ""},
+                )
+                detail = f"{len(text)} caracteres"
+                if translation:
+                    detail += f" · traduzido para {lang_out}"
+                self.notify("file_stt_status", {"title": "Pronto", "detail": detail})
+            except Exception as exc:
+                log(f"Erro STT arquivo: {exc}\n{traceback.format_exc()}")
+                self.notify("file_stt_status", {"title": "Erro", "detail": str(exc)[:160]})
+            finally:
+                self._file_stt_busy = False
+                self._file_stt = None
+                if tmp_path:
+                    try:
+                        os.remove(tmp_path)
+                    except OSError:
+                        pass
                 self._emit_state()
 
         threading.Thread(target=work, daemon=True).start()

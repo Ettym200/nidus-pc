@@ -105,6 +105,7 @@ dd{margin:2px 0 0;font-size:15px}.muted{color:var(--mute);font-size:12px}
       <button class="nav" data-go="live">◉ Live</button>
       <button class="nav" data-go="entrevista">◌ Entrevista</button>
       <button class="nav" data-go="texto">文 Traduzir texto</button>
+      <button class="nav" data-go="audiofile">🎙 Transcrever áudio</button>
       <button class="nav" data-go="uga">ϟ Uga Buga</button>
       <div class="foot">
         <div class="update"><b>UI redesenhada</b>Rail lateral, ação fixa e configurações mais limpas.</div>
@@ -285,6 +286,45 @@ dd{margin:2px 0 0;font-size:15px}.muted{color:var(--mute);font-size:12px}
       </div>
     </section>
 
+    <!-- TRANSCRIBIR ÁUDIO -->
+    <section class="pane" id="audiofile" hidden>
+      <div class="scroll">
+        <div class="head">
+          <div>
+            <h1>Transcrever áudio</h1>
+            <p>Áudio do WhatsApp (ogg/mp3) ou outro arquivo vira texto — local, com Whisper.</p>
+          </div>
+        </div>
+        <div class="formgrid">
+          <div class="field"><label>Idioma do áudio</label><select id="af-source-lang"></select></div>
+          <div class="field"><label>Whisper</label><select id="af-whisper"></select></div>
+          <div class="field"><label>Processamento</label><select id="af-compute"></select></div>
+          <div class="field"><label>Traduzir para</label><select id="af-target-lang"></select></div>
+          <div class="field"><label>&nbsp;</label>
+            <label class="check"><input type="checkbox" id="af-translate"> Também traduzir depois</label>
+          </div>
+        </div>
+        <div class="drop" id="af-drop">
+          <h3 id="af-filename">Solte o áudio aqui</h3>
+          <p>MP3, OGG, Opus, WAV, M4A — inclusive áudio do WhatsApp. Ou escolha um arquivo.</p>
+          <div style="margin-top:12px;display:flex;gap:8px;justify-content:center">
+            <button class="quiet" id="af-pick" type="button">Abrir áudio</button>
+            <input type="file" id="af-file" accept="audio/*,.ogg,.opus,.mp3,.m4a,.wav,.webm" hidden>
+          </div>
+        </div>
+        <div class="section" style="margin-top:20px">Transcrição</div>
+        <div class="livebox" id="af-out">O texto aparece aqui.</div>
+        <div class="section" style="margin-top:16px" id="af-tr-label" hidden>Tradução</div>
+        <div class="livebox" id="af-translation" hidden>A tradução aparece aqui.</div>
+      </div>
+      <div class="action">
+        <div class="status"><b><span id="af-status-title">Aguardando</span></b><small id="af-status-detail">Nenhum áudio</small></div>
+        <button class="quiet" id="af-clear">Limpar</button>
+        <button class="quiet" id="af-copy">Copiar</button>
+        <button class="primary" id="af-run" disabled>▷ Transcrever</button>
+      </div>
+    </section>
+
     <!-- UGA -->
     <section class="pane" id="uga" hidden>
       <div class="scroll">
@@ -338,6 +378,7 @@ const api=()=>window.pywebview&&window.pywebview.api;
 const $=s=>document.querySelector(s);
 let state=null;
 let ugaImages=[]; // {id, dataUrl}
+let audioFile=null; // {name, dataUrl}
 
 function fillSelect(sel, items, valueKey='id', labelKey='label'){
   if(!sel) return;
@@ -444,6 +485,24 @@ function applyText(s){
   $('#text-run').disabled=!!(s.text&&s.text.busy);
 }
 
+function applyFileStt(s){
+  const c=s.config||{};
+  fillSelect($('#af-source-lang'), s.audio_source_langs||['auto']);
+  fillSelect($('#af-whisper'), s.whisper_models||['tiny']);
+  fillSelect($('#af-compute'), s.compute_options||['cpu']);
+  fillSelect($('#af-target-lang'), s.languages||[]);
+  const srcCode=c.audio_source_language||'auto';
+  const srcLabel=Object.entries(s.audio_source_map||{}).find(([,v])=>v===srcCode)?.[0]||'auto';
+  if(!$('#af-source-lang').matches(':focus')) $('#af-source-lang').value=srcLabel;
+  $('#af-whisper').value=c.whisper_model||'tiny';
+  $('#af-compute').value=c.whisper_compute_device||'cpu';
+  $('#af-target-lang').value=c.target_language||'Português';
+  const busy=!!(s.file_stt&&s.file_stt.busy);
+  $('#af-run').disabled=busy || !audioFile;
+  if(busy) $('#af-run').textContent='Transcrevendo...';
+  else $('#af-run').textContent='▷ Transcrever';
+}
+
 function applyUga(s){
   updateUgaUi();
   $('#uga-run').disabled=!!(s.uga&&s.uga.busy) || (!ugaImages.length && !($('#uga-text').value||'').trim());
@@ -506,6 +565,7 @@ window.nidusEvent=(event,payload)=>{
     applyLive(payload);
     applyInterview(payload);
     applyText(payload);
+    applyFileStt(payload);
     applyUga(payload);
     fillSettings(payload);
   }
@@ -546,6 +606,17 @@ window.nidusEvent=(event,payload)=>{
   }
   if(event==='uga_result'){
     $('#uga-out').textContent=payload.text||'';
+  }
+  if(event==='file_stt_status'){
+    $('#af-status-title').textContent=payload.title||'';
+    $('#af-status-detail').textContent=payload.detail||'';
+  }
+  if(event==='file_stt_result'){
+    $('#af-out').textContent=payload.text||'(vazio)';
+    const tr=payload.translation||'';
+    $('#af-translation').hidden=!tr;
+    $('#af-tr-label').hidden=!tr;
+    if(tr) $('#af-translation').textContent=tr;
   }
 };
 
@@ -664,6 +735,69 @@ $('#text-clear').onclick=()=>{
 };
 $('#text-copy').onclick=async()=>{
   try{ await navigator.clipboard.writeText($('#text-out').textContent||''); }catch(_){}
+};
+
+/* File STT */
+function setAudioFile(name, dataUrl){
+  audioFile={name, dataUrl};
+  $('#af-filename').textContent=name||'Áudio carregado';
+  $('#af-status-title').textContent='Pronto';
+  $('#af-status-detail').textContent=name||'';
+  $('#af-run').disabled=false;
+}
+function clearAudioFile(){
+  audioFile=null;
+  $('#af-filename').textContent='Solte o áudio aqui';
+  $('#af-out').textContent='O texto aparece aqui.';
+  $('#af-translation').textContent='A tradução aparece aqui.';
+  $('#af-translation').hidden=true;
+  $('#af-tr-label').hidden=true;
+  $('#af-status-title').textContent='Aguardando';
+  $('#af-status-detail').textContent='Nenhum áudio';
+  $('#af-run').disabled=true;
+}
+async function loadAudioBlob(file){
+  if(!file) return;
+  const dataUrl=await readFileAsDataUrl(file);
+  setAudioFile(file.name||'audio.ogg', dataUrl);
+}
+$('#af-pick').onclick=()=>$('#af-file').click();
+$('#af-file').onchange=async e=>{
+  const f=e.target.files&&e.target.files[0];
+  if(f) await loadAudioBlob(f);
+  e.target.value='';
+};
+const afDrop=$('#af-drop');
+afDrop.ondragover=e=>{e.preventDefault(); afDrop.classList.add('drag');};
+afDrop.ondragleave=()=>afDrop.classList.remove('drag');
+afDrop.ondrop=async e=>{
+  e.preventDefault(); afDrop.classList.remove('drag');
+  const f=e.dataTransfer.files&&e.dataTransfer.files[0];
+  if(f) await loadAudioBlob(f);
+};
+$('#af-clear').onclick=clearAudioFile;
+$('#af-copy').onclick=async()=>{
+  const parts=[$('#af-out').textContent||''];
+  if(!$('#af-translation').hidden) parts.push($('#af-translation').textContent||'');
+  try{ await navigator.clipboard.writeText(parts.filter(Boolean).join('\n\n')); }catch(_){}
+};
+$('#af-run').onclick=async()=>{
+  if(!api()||!audioFile) return;
+  await api().patch_config({
+    whisper_model:$('#af-whisper').value,
+    whisper_compute_device:$('#af-compute').value,
+  });
+  const res=await api().transcribe_audio_file(
+    audioFile.name,
+    audioFile.dataUrl,
+    $('#af-source-lang').value,
+    $('#af-translate').checked,
+    $('#af-target-lang').value,
+  );
+  if(res&&res.error){
+    $('#af-status-title').textContent='Erro';
+    $('#af-status-detail').textContent=res.error;
+  }
 };
 
 /* Uga */

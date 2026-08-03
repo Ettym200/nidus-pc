@@ -162,3 +162,63 @@ class SpeechToText:
                     raise
 
         return ""
+
+    def transcribe_file(self, path: str, timeout: float = 600) -> str:
+        """Transcreve arquivo de áudio (mp3, ogg, opus, wav, m4a, webm...)."""
+        self.load()
+        log(f"Transcrevendo arquivo: {path} ({self.device.upper()})...")
+
+        def _run():
+            segments, info = self._model.transcribe(
+                path,
+                language=self.language,
+                vad_filter=True,
+                beam_size=1,
+                condition_on_previous_text=False,
+                temperature=0.0,
+                compression_ratio_threshold=2.2,
+                log_prob_threshold=-1.0,
+                no_speech_threshold=0.65,
+            )
+            parts = []
+            for seg in segments:
+                text = (seg.text or "").strip()
+                if not text:
+                    continue
+                no_speech = getattr(seg, "no_speech_prob", 0.0) or 0.0
+                avg_logprob = getattr(seg, "avg_logprob", 0.0) or 0.0
+                if no_speech > 0.7:
+                    continue
+                if avg_logprob < -1.2:
+                    continue
+                parts.append(text)
+            detected = getattr(info, "language", None)
+            duration = getattr(info, "duration", None)
+            text = sanitize_speech_text(" ".join(parts))
+            dur = f"{duration:.1f}s" if duration is not None else "?"
+            log(f"STT arquivo: {dur} → '{text[:80]}' (lang={detected})")
+            return text
+
+        for attempt in range(2):
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                future = pool.submit(_run)
+                try:
+                    return future.result(timeout=timeout)
+                except FuturesTimeout:
+                    log(f"STT arquivo timeout após {timeout}s")
+                    if self.device == "cuda" and attempt == 0:
+                        self._fallback_to_cpu()
+                        continue
+                    raise TimeoutError(
+                        f"Transcrição demorou mais de {int(timeout)}s. "
+                        "Tente o modelo 'tiny' ou um áudio mais curto."
+                    )
+                except Exception as exc:
+                    err = str(exc).lower()
+                    if self.device == "cuda" and attempt == 0 and (
+                        "cublas" in err or "cuda" in err or "dll" in err
+                    ):
+                        self._fallback_to_cpu()
+                        continue
+                    raise
+        return ""

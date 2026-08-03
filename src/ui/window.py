@@ -61,6 +61,22 @@ class Api:
     def interview_toggle(self):
         return self._controller.interview_toggle()
 
+    def transcribe_audio_file(
+        self,
+        filename="",
+        data_b64="",
+        source_language=None,
+        also_translate=False,
+        target_language=None,
+    ):
+        return self._controller.transcribe_audio_file(
+            filename=filename,
+            data_b64=data_b64,
+            source_language=source_language,
+            also_translate=also_translate,
+            target_language=target_language,
+        )
+
     def open_url(self, url):
         webbrowser.open(url)
 
