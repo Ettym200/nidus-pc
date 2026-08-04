@@ -7,6 +7,8 @@ APP_VERSION = "1.1.0"
 
 
 def is_admin():
+    if sys.platform != "win32":
+        return False
     try:
         return bool(ctypes.windll.shell32.IsUserAnAdmin())
     except Exception:
@@ -14,6 +16,8 @@ def is_admin():
 
 
 def relaunch_as_admin():
+    if sys.platform != "win32":
+        return
     exe = sys.executable
     params = subprocess.list2cmdline(sys.argv[1:])
     cwd = os.path.dirname(os.path.abspath(exe))

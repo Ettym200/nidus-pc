@@ -4,7 +4,7 @@ import queue
 import threading
 import time
 
-from src.audio_capture import AudioCapture, SAMPLE_RATE
+from src.audio_constants import SAMPLE_RATE
 from src.audio_sources import create_audio_capture
 from src.debug_log import log
 from src.text_sanitize import sanitize_display_text
@@ -12,18 +12,20 @@ from src.interview_buffer import InterviewQuestionBuffer
 from src.speech_to_text import SpeechToText
 from src.translator import Translator
 from src.vad_processor import VADProcessor
+from src.ui.config_store import same_audio_language
 
 
 class AudioPipeline:
     def __init__(
         self,
-        translator: Translator,
+        translator: Translator | None = None,
         device: str | None = None,
         capture_mode: str = "system",
         target_pid: int | None = None,
         whisper_model: str = "base",
         compute_device: str = "auto",
         source_language: str = "auto",
+        target_language: str = "Português",
         streaming: bool = True,
         mode: str = "translate",
         interview_context: str = "",
@@ -42,6 +44,7 @@ class AudioPipeline:
         self.whisper_model = whisper_model
         self.compute_device = compute_device
         self.source_language = source_language
+        self.target_language = target_language
         self.streaming = streaming
         self.mode = mode
         self.interview_context = interview_context
@@ -162,7 +165,23 @@ class AudioPipeline:
         self.on_status("Parado")
         log("Pipeline parado.")
 
+    def _should_skip_translate(self) -> bool:
+        if self.mode != "translate":
+            return False
+        target = self.target_language
+        if self.translator and getattr(self.translator, "target_language", None):
+            target = self.translator.target_language
+        return same_audio_language(self.source_language, target)
+
     def _translate(self, text: str):
+        if self._should_skip_translate() or not self.translator:
+            cleaned = sanitize_display_text(text)
+            if cleaned and cleaned != self._last_output:
+                self._last_output = cleaned
+                self.on_translation(cleaned)
+                log(f"Mesmo idioma — só transcrição: '{cleaned[:80]}'")
+            return
+
         log(f"Traduzindo: '{text[:80]}'")
         if self.streaming:
             def _on_partial(partial: str):
@@ -278,7 +297,10 @@ class AudioPipeline:
                 self._last_transcript = text
 
                 self.on_original(text)
-                self.on_status("Traduzindo...")
+                if self._should_skip_translate():
+                    self.on_status("Mesmo idioma — só transcrevendo...")
+                else:
+                    self.on_status("Traduzindo...")
                 self._translate(text)
                 self.on_status(f"Ouvindo áudio ({device_label()})...")
             except Exception as exc:

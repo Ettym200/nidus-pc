@@ -4,7 +4,7 @@ import collections
 
 import numpy as np
 
-from src.audio_capture import SAMPLE_RATE
+from src.audio_constants import SAMPLE_RATE
 
 CHUNK_DURATION = 0.032  # 32 ms
 

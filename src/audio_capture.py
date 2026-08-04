@@ -6,13 +6,12 @@ import time
 
 import numpy as np
 
+from src.audio_constants import READ_DURATION, SAMPLE_RATE
+
 try:
     import pyaudiowpatch as pyaudio
 except ImportError:
     pyaudio = None
-
-SAMPLE_RATE = 16000
-READ_DURATION = 0.032  # 32 ms — alimenta o VAD com baixa latência
 
 
 def _require_pyaudio():

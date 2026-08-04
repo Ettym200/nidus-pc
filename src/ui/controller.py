@@ -8,13 +8,13 @@ import threading
 import traceback
 import tkinter as tk
 
-import keyboard
 import mss
 from PIL import Image
 
 from src.audio_pipeline import AudioPipeline
 from src.capture import ScreenCapture
 from src.debug_log import log
+from src.hotkeys import clear_hotkeys, register_hotkeys
 from src.overlay import OVERLAY_STYLE_OPTIONS, Overlay
 from src.speech_to_text import COMPUTE_OPTIONS, WHISPER_MODELS, SpeechToText
 from src.translator import KNOWN_PROVIDERS, Translator
@@ -25,6 +25,7 @@ from src.ui.config_store import (
     LANGUAGES,
     load_config,
     save_config,
+    same_audio_language,
 )
 from src.ui.region_selector import RegionSelector
 
@@ -32,20 +33,23 @@ AUDIO_FILE_EXTS = {".mp3", ".ogg", ".opus", ".wav", ".m4a", ".webm", ".mp4", ".a
 MAX_AUDIO_FILE_BYTES = 40 * 1024 * 1024
 
 try:
-    from src.audio_capture import list_output_devices
     from src.audio_sources import (
-        CAPTURE_MODES,
+        get_capture_modes,
         is_app_capture_supported,
+        is_audio_supported,
         list_audio_applications,
+        list_output_devices,
     )
 
-    AUDIO_AVAILABLE = sys.platform == "win32"
+    AUDIO_AVAILABLE = is_audio_supported()
+    CAPTURE_MODES = get_capture_modes()
 except ImportError:
     AUDIO_AVAILABLE = False
-    CAPTURE_MODES = []
+    CAPTURE_MODES = [("system", "Todo o sistema")]
     list_output_devices = lambda: []
     list_audio_applications = lambda: []
     is_app_capture_supported = lambda: False
+    get_capture_modes = lambda: CAPTURE_MODES
 
 
 class NidusController:
@@ -191,12 +195,13 @@ class NidusController:
             "overlay_styles": [{"id": sid, "label": label} for sid, label in OVERLAY_STYLE_OPTIONS],
             "whisper_models": WHISPER_MODELS,
             "compute_options": COMPUTE_OPTIONS,
-            "capture_modes": [{"id": mid, "label": label} for mid, label in CAPTURE_MODES],
+            "capture_modes": [{"id": mid, "label": label} for mid, label in get_capture_modes()],
             "audio_source_langs": AUDIO_SOURCE_LANGS,
             "audio_source_map": AUDIO_SOURCE_MAP,
             "interview_types": INTERVIEW_TYPES,
             "audio_available": AUDIO_AVAILABLE,
             "app_capture_supported": is_app_capture_supported(),
+            "platform": sys.platform,
             "monitors": [
                 {"index": i, "width": m["width"], "height": m["height"]}
                 for i, m in enumerate(self._monitors)
@@ -594,7 +599,10 @@ class NidusController:
         if not AUDIO_AVAILABLE:
             self.notify("live_status", {"title": "Indisponível", "detail": "Recurso só no Windows."})
             return
-        if not self.config.get("api_key"):
+        src_lang = self.config.get("audio_source_language", "auto")
+        target_lang = self.config.get("target_language", "Português")
+        skip_translate = same_audio_language(src_lang, target_lang)
+        if not skip_translate and not self.config.get("api_key"):
             self.notify("live_status", {"title": "Erro", "detail": "Configure a API Key (⚙)."})
             return
         if self._interview_running:
@@ -610,12 +618,13 @@ class NidusController:
 
         device = self.config.get("audio_device") or None
         self._ensure_overlay()
-        self.notify("live_status", {"title": "Iniciando...", "detail": "Carregando Whisper"})
+        detail = "Só transcrição (mesmo idioma)" if skip_translate else "Carregando Whisper"
+        self.notify("live_status", {"title": "Iniciando...", "detail": detail})
         self._emit_state()
 
         def work():
             try:
-                translator = self._make_translator()
+                translator = None if skip_translate else self._make_translator()
                 pipeline = AudioPipeline(
                     translator=translator,
                     device=device,
@@ -623,7 +632,8 @@ class NidusController:
                     target_pid=target_pid if capture_mode == "application" else None,
                     whisper_model=self.config.get("whisper_model", "tiny"),
                     compute_device=self.config.get("whisper_compute_device", "cpu"),
-                    source_language=self.config.get("audio_source_language", "auto"),
+                    source_language=src_lang,
+                    target_language=target_lang,
                     streaming=bool(self.config.get("audio_streaming", True)),
                     mode="translate",
                     on_status=lambda msg: self.notify("live_status", {"title": msg, "detail": ""}),
@@ -637,7 +647,8 @@ class NidusController:
                 pipeline.start()
                 self._audio_pipeline = pipeline
                 self._audio_running = True
-                self.notify("live_status", {"title": "Ouvindo...", "detail": "Aguardando fala"})
+                status = "Ouvindo (só transcrição)..." if skip_translate else "Ouvindo..."
+                self.notify("live_status", {"title": status, "detail": "Aguardando fala"})
                 self._emit_state()
             except Exception as exc:
                 log(f"Erro ao iniciar áudio: {exc}\n{traceback.format_exc()}")
@@ -775,41 +786,25 @@ class NidusController:
     def _normalize_hotkey(self, hotkey: str) -> str:
         return (hotkey or "").strip().lower()
 
-    def _register_hotkey(self, hotkey: str, callback):
-        hk = self._normalize_hotkey(hotkey)
-        if not hk or sys.platform != "win32":
-            return
-        try:
-            keyboard.add_hotkey(hk, callback, suppress=False)
-        except Exception as exc:
-            log(f"Hotkey '{hk}' não registrado: {exc}")
-
     def _run_hotkey(self, fn):
         threading.Thread(target=fn, daemon=True).start()
 
     def _register_hotkeys(self):
-        if sys.platform != "win32":
-            return
-        if self._hotkeys_registered:
-            try:
-                keyboard.unhook_all_hotkeys()
-            except Exception:
-                pass
-        self._register_hotkey(
-            self.config.get("hotkey_region", "f9"),
-            lambda: self._run_hotkey(self._select_region_standalone),
-        )
-        self._register_hotkey(
-            self.config.get("hotkey_translate", "f10"),
-            lambda: self._run_hotkey(self.translate_toggle),
-        )
-        self._register_hotkey(
-            self.config.get("hotkey_toggle", "f11"),
-            lambda: self._run_hotkey(self.toggle_overlay),
-        )
-        self._register_hotkey(
-            self.config.get("hotkey_audio", "f12"),
-            lambda: self._run_hotkey(self.audio_toggle),
+        register_hotkeys(
+            {
+                self.config.get("hotkey_region", "f9"): lambda: self._run_hotkey(
+                    self._select_region_standalone
+                ),
+                self.config.get("hotkey_translate", "f10"): lambda: self._run_hotkey(
+                    self.translate_toggle
+                ),
+                self.config.get("hotkey_toggle", "f11"): lambda: self._run_hotkey(
+                    self.toggle_overlay
+                ),
+                self.config.get("hotkey_audio", "f12"): lambda: self._run_hotkey(
+                    self.audio_toggle
+                ),
+            }
         )
         self._hotkeys_registered = True
 
@@ -819,8 +814,4 @@ class NidusController:
             self._stop_audio()
         if self._interview_running:
             self._stop_interview()
-        if sys.platform == "win32":
-            try:
-                keyboard.unhook_all_hotkeys()
-            except Exception:
-                pass
+        clear_hotkeys()

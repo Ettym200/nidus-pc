@@ -1,0 +1,105 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install -U pip
+          pip install -r requirements.txt pyinstaller
+      - name: Build icon
+        run: python scripts/build_icon.py
+      - name: PyInstaller (Windows)
+        shell: cmd
+        run: |
+          set EXTRA_DATA=--add-data assets\icon.png;assets --add-data assets\icon.ico;assets --add-data src\ui\web;src\ui\web
+          if exist assets\code.jpeg set EXTRA_DATA=%EXTRA_DATA% --add-data assets\code.jpeg;assets
+          python -m PyInstaller --noconfirm --onefile --windowed --name Nidus --icon assets\icon.ico %EXTRA_DATA% --hidden-import PIL --hidden-import mss --hidden-import openai --hidden-import anthropic --hidden-import keyboard --hidden-import mouse --hidden-import webview --hidden-import webview.platforms.edgechromium --hidden-import bottle --hidden-import src.capture --hidden-import src.translator --hidden-import src.overlay --hidden-import src.ui_theme --hidden-import src.updater --hidden-import src.audio_pipeline --hidden-import src.audio_capture --hidden-import src.audio_capture_linux --hidden-import src.app_audio_capture --hidden-import src.audio_sources --hidden-import src.hotkeys --hidden-import src.speech_to_text --hidden-import src.vad_processor --hidden-import src.interview_buffer --hidden-import src.text_sanitize --hidden-import src.debug_log --hidden-import src.ui.window --hidden-import src.ui.controller --hidden-import src.ui.config_store --hidden-import src.ui.region_selector --hidden-import faster_whisper --hidden-import pyaudiowpatch --collect-all webview --collect-all mss --collect-all faster_whisper main.py
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nidus-windows
+          path: dist/Nidus.exe
+
+  linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: System packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-pip python3-gi python3-gi-cairo \
+            gir1.2-gtk-3.0 gir1.2-webkit2-4.1 \
+            libgirepository1.0-dev libcairo2-dev pkg-config
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install -U pip
+          pip install -r requirements.txt pyinstaller
+      - name: Build Linux binary
+        run: bash scripts/compilar_linux.sh
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nidus-linux
+          path: dist/Nidus-linux
+
+  publish:
+    needs: [windows, linux]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: nidus-windows
+          path: release
+      - uses: actions/download-artifact@v4
+        with:
+          name: nidus-linux
+          path: release
+      - name: Rename assets
+        run: |
+          mv release/Nidus.exe "release/Nidus-windows.exe"
+          mv release/Nidus-linux "release/Nidus-linux"
+          chmod +x release/Nidus-linux
+          ls -lah release
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/Nidus-windows.exe
+            release/Nidus-linux
+          generate_release_notes: true
+          body: |
+            ## Downloads
+            - **Windows:** `Nidus-windows.exe`
+            - **Linux:** `Nidus-linux` (PulseAudio/PipeWire; Live = áudio do sistema)
+
+            ### Linux — deps de sistema
+            ```bash
+            # Debian/Ubuntu
+            sudo apt install gir1.2-gtk-3.0 gir1.2-webkit2-4.1 pipewire-pulse
+            chmod +x Nidus-linux
+            ./Nidus-linux
+            ```
+
+            Captura por aplicativo específico continua só no Windows.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

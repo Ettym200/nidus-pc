@@ -49,6 +49,37 @@ AUDIO_SOURCE_MAP = {
     "Francês": "fr", "Alemão": "de", "Coreano": "ko", "Chinês": "zh", "Russo": "ru",
 }
 
+# Whisper code → possible target language labels (case-insensitive match)
+_SOURCE_CODE_ALIASES = {
+    "pt": ("português", "portugues", "portuguese", "pt-br", "pt"),
+    "en": ("inglês", "ingles", "english", "en"),
+    "es": ("espanhol", "spanish", "es"),
+    "ja": ("japonês", "japones", "japanese", "ja"),
+    "fr": ("francês", "frances", "french", "fr"),
+    "de": ("alemão", "alemao", "german", "de"),
+    "ko": ("coreano", "korean", "ko"),
+    "zh": ("chinês", "chines", "chinese", "zh", "chinês simplificado", "chinês tradicional"),
+    "ru": ("russo", "russian", "ru"),
+}
+
+
+def same_audio_language(source_code: str | None, target_label: str | None) -> bool:
+    """True when heard language and translate-to language are the same (skip translate)."""
+    src = (source_code or "auto").strip().lower()
+    target = (target_label or "").strip().lower()
+    if not src or src == "auto" or not target:
+        return False
+    for label, code in AUDIO_SOURCE_MAP.items():
+        if label == "auto":
+            continue
+        if src not in (code, label.lower()):
+            continue
+        aliases = _SOURCE_CODE_ALIASES.get(code, (label.lower(),))
+        if target == label.lower() or target in aliases:
+            return True
+    return src == target
+
+
 INTERVIEW_TYPES = ["Geral", "Técnica", "Comportamental", "RH / Cultura"]
 
 

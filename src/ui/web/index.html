@@ -202,9 +202,10 @@ dd{margin:2px 0 0;font-size:15px}.muted{color:var(--mute);font-size:12px}
             <label class="check"><input type="checkbox" id="live-streaming" checked> Streaming</label>
           </div>
         </div>
+        <p class="muted" id="live-platform-hint" style="margin:0 0 16px"></p>
         <div class="section">Ouvido</div>
         <div class="livebox" id="live-original">Aguardando áudio...</div>
-        <div class="section" style="margin-top:16px">Tradução</div>
+        <div class="section" style="margin-top:16px" id="live-out-label">Tradução</div>
         <div class="livebox" id="live-translation">As legendas aparecem aqui.</div>
       </div>
       <div class="action">
@@ -227,6 +228,7 @@ dd{margin:2px 0 0;font-size:15px}.muted{color:var(--mute);font-size:12px}
         <div class="formgrid">
           <div class="field"><label>Tipo</label><select id="iv-type"></select></div>
           <div class="field"><label>Responder em</label><select id="iv-answer-lang"></select></div>
+          <div class="field"><label>Idioma ouvido</label><select id="iv-source-lang"></select></div>
           <div class="field"><label>Captura</label><select id="iv-capture-mode"></select></div>
           <div class="field"><label>Dispositivo</label><select id="iv-device"></select></div>
           <div class="field" id="iv-app-field" hidden><label>Aplicativo</label>
@@ -383,19 +385,31 @@ let audioFile=null; // {name, dataUrl}
 function fillSelect(sel, items, valueKey='id', labelKey='label'){
   if(!sel) return;
   const cur=sel.value;
-  sel.innerHTML='';
-  (items||[]).forEach(it=>{
-    const o=document.createElement('option');
-    if(typeof it==='string'){ o.value=it; o.textContent=it; }
-    else { o.value=it[valueKey]; o.textContent=it[labelKey]; }
-    sel.appendChild(o);
-  });
+  const next=(items||[]).map(it=>typeof it==='string'?{value:it,label:it}:{value:it[valueKey],label:it[labelKey]});
+  const same=sel.options.length===next.length && next.every((it,i)=>sel.options[i].value===String(it.value));
+  if(!same){
+    sel.innerHTML='';
+    next.forEach(it=>{
+      const o=document.createElement('option');
+      o.value=it.value; o.textContent=it.label;
+      sel.appendChild(o);
+    });
+  }
   if(cur) sel.value=cur;
+}
+
+function setAppFieldVisible(field, modeSel){
+  if(!field||!modeSel) return;
+  const show=modeSel.value==='application';
+  field.hidden=!show;
+  if(show) field.style.display='';
 }
 
 document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('.nav').forEach(n=>n.setAttribute('aria-current', n===b ? 'true' : 'false'));
   document.querySelectorAll('.pane').forEach(p=>p.hidden=p.id!==b.dataset.go);
+  if(b.dataset.go==='live' && $('#live-capture-mode').value==='application') refreshApps('live');
+  if(b.dataset.go==='entrevista' && $('#iv-capture-mode').value==='application') refreshApps('iv');
 });
 
 function applyGame(game,c){
@@ -430,40 +444,64 @@ function applyGame(game,c){
 function applyLive(s){
   const c=s.config||{};
   const live=s.live||{};
+  const editing=!$('#live').hidden;
   fillSelect($('#live-capture-mode'), s.capture_modes||[{id:'system',label:'Todo o sistema'}]);
   fillSelect($('#live-source-lang'), s.audio_source_langs||['auto']);
   fillSelect($('#live-target-lang'), s.languages||[]);
   fillSelect($('#live-whisper'), s.whisper_models||['tiny']);
   fillSelect($('#live-compute'), s.compute_options||['cpu']);
-  $('#live-capture-mode').value=c.audio_capture_mode||'system';
-  $('#live-target-lang').value=c.target_language||'Português';
-  $('#live-whisper').value=c.whisper_model||'tiny';
-  $('#live-compute').value=c.whisper_compute_device||'cpu';
-  $('#live-streaming').checked=!!c.audio_streaming;
-  const srcCode=c.audio_source_language||'auto';
-  const srcLabel=Object.entries(s.audio_source_map||{}).find(([,v])=>v===srcCode)?.[0]||'auto';
-  $('#live-source-lang').value=srcLabel;
-  $('#live-app-field').hidden=($('#live-capture-mode').value!=='application');
+  if(!editing){
+    $('#live-capture-mode').value=c.audio_capture_mode||'system';
+    $('#live-target-lang').value=c.target_language||'Português';
+    $('#live-whisper').value=c.whisper_model||'tiny';
+    $('#live-compute').value=c.whisper_compute_device||'cpu';
+    $('#live-streaming').checked=!!c.audio_streaming;
+    const srcCode=c.audio_source_language||'auto';
+    const srcLabel=Object.entries(s.audio_source_map||{}).find(([,v])=>v===srcCode)?.[0]||'auto';
+    $('#live-source-lang').value=srcLabel;
+  }
+  setAppFieldVisible($('#live-app-field'), $('#live-capture-mode'));
+  const srcNow=$('#live-source-lang').value;
+  const tgtNow=$('#live-target-lang').value;
+  const map=s.audio_source_map||{};
+  const same=(srcNow && srcNow!=='auto' && srcNow===tgtNow) || (map[srcNow] && srcNow===tgtNow);
+  $('#live-out-label').textContent=same?'Legenda (sem traduzir)':'Tradução';
   const run=$('#live-run');
   if(live.running){ run.textContent='■ Parar'; }
   else { run.innerHTML='▷ Iniciar <small>F12</small>'; }
   $('#live-status-detail').textContent=`${c.whisper_model||'tiny'} · ${c.whisper_compute_device||'cpu'}`;
+  const hint=$('#live-platform-hint');
+  if(hint){
+    if(s.app_capture_supported){ hint.textContent=''; }
+    else if((s.platform||'').startsWith('linux')){
+      hint.textContent='Linux: Live captura o áudio do sistema (Pulse/PipeWire). App específico ainda é só no Windows.';
+    } else {
+      hint.textContent='';
+    }
+  }
 }
 
 function applyInterview(s){
   const c=s.config||{};
   const iv=s.interview||{};
+  const editing=!$('#entrevista').hidden;
   fillSelect($('#iv-type'), s.interview_types||[]);
   fillSelect($('#iv-answer-lang'), s.languages||[]);
+  fillSelect($('#iv-source-lang'), s.audio_source_langs||['auto']);
   fillSelect($('#iv-capture-mode'), s.capture_modes||[{id:'system',label:'Todo o sistema'}]);
   fillSelect($('#iv-whisper'), s.whisper_models||['tiny']);
-  if(!$('#iv-context').matches(':focus')) $('#iv-context').value=c.interview_context||'';
-  $('#iv-type').value=c.interview_type||'Geral';
-  $('#iv-answer-lang').value=c.interview_answer_language||'Português';
-  $('#iv-capture-mode').value=c.interview_capture_mode||'system';
-  $('#iv-whisper').value=c.whisper_model||'tiny';
-  $('#iv-streaming').checked=!!c.interview_streaming;
-  $('#iv-app-field').hidden=($('#iv-capture-mode').value!=='application');
+  if(!editing){
+    if(!$('#iv-context').matches(':focus')) $('#iv-context').value=c.interview_context||'';
+    $('#iv-type').value=c.interview_type||'Geral';
+    $('#iv-answer-lang').value=c.interview_answer_language||'Português';
+    const srcCode=c.audio_source_language||'auto';
+    const srcLabel=Object.entries(s.audio_source_map||{}).find(([,v])=>v===srcCode)?.[0]||'auto';
+    $('#iv-source-lang').value=srcLabel;
+    $('#iv-capture-mode').value=c.interview_capture_mode||'system';
+    $('#iv-whisper').value=c.whisper_model||'tiny';
+    $('#iv-streaming').checked=!!c.interview_streaming;
+  }
+  setAppFieldVisible($('#iv-app-field'), $('#iv-capture-mode'));
   const run=$('#iv-run');
   if(iv.running){ run.textContent='■ Parar'; }
   else { run.textContent='▷ Iniciar'; }
@@ -543,14 +581,17 @@ async function refreshApps(which){
   if(!api()) return;
   try{
     const apps=await api().list_audio_apps();
-    const items=[{id:'0',label:'(nenhum)'}].concat((apps||[]).map(a=>({id:String(a.pid),label:a.label})));
+    const items=[{id:'0',label: (apps&&apps.length)?'(selecione o app)':'(nenhum app com áudio — abra Meet/Zoom e clique ↻)'}]
+      .concat((apps||[]).map(a=>({id:String(a.pid),label:a.label})));
     if(which==='live'||!which){
       fillSelect($('#live-app'), items);
-      $('#live-app').value=String((state?.config?.audio_target_pid)||0);
+      const want=String((state?.config?.audio_target_pid)||0);
+      $('#live-app').value=items.some(i=>i.id===want)?want:items[0].id;
     }
     if(which==='iv'||!which){
       fillSelect($('#iv-app'), items);
-      $('#iv-app').value=String((state?.config?.interview_target_pid)||0);
+      const want=String((state?.config?.interview_target_pid)||0);
+      $('#iv-app').value=items.some(i=>i.id===want)?want:items[0].id;
     }
   }catch(_){}
 }
@@ -658,9 +699,10 @@ $('#settings-save').onclick=async()=>{
 };
 
 /* Live */
-$('#live-capture-mode').onchange=()=>{
-  $('#live-app-field').hidden=$('#live-capture-mode').value!=='application';
-  if($('#live-capture-mode').value==='application') refreshApps('live');
+$('#live-capture-mode').onchange=async()=>{
+  setAppFieldVisible($('#live-app-field'), $('#live-capture-mode'));
+  if($('#live-capture-mode').value==='application') await refreshApps('live');
+  if(api()) await api().patch_config({audio_capture_mode:$('#live-capture-mode').value});
 };
 $('#live-refresh-apps').onclick=()=>refreshApps('live');
 $('#live-save').onclick=async()=>{
@@ -685,18 +727,21 @@ $('#live-run').onclick=async()=>{
 };
 
 /* Interview */
-$('#iv-capture-mode').onchange=()=>{
-  $('#iv-app-field').hidden=$('#iv-capture-mode').value!=='application';
-  if($('#iv-capture-mode').value==='application') refreshApps('iv');
+$('#iv-capture-mode').onchange=async()=>{
+  setAppFieldVisible($('#iv-app-field'), $('#iv-capture-mode'));
+  if($('#iv-capture-mode').value==='application') await refreshApps('iv');
+  if(api()) await api().patch_config({interview_capture_mode:$('#iv-capture-mode').value});
 };
 $('#iv-refresh-apps').onclick=()=>refreshApps('iv');
 $('#iv-save').onclick=async()=>{
   if(!api())return;
+  const map=state?.audio_source_map||{};
   const device=$('#iv-device').value;
   await api().patch_config({
     interview_context:$('#iv-context').value.trim(),
     interview_type:$('#iv-type').value,
     interview_answer_language:$('#iv-answer-lang').value,
+    audio_source_language:map[$('#iv-source-lang').value]||'auto',
     interview_capture_mode:$('#iv-capture-mode').value,
     interview_audio_device:device==='(Padrão do sistema)'?'':device,
     interview_target_pid:parseInt($('#iv-app').value||'0',10),

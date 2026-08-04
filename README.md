@@ -1,8 +1,8 @@
 # Nidus
 
-Nidus é um aplicativo de tradução para **PC (Windows)** que exibe um overlay flutuante sobre jogos e outros programas, capturando o texto da tela e traduzindo em tempo real com o provedor de IA da sua escolha.
+Nidus é um aplicativo de tradução para **PC (Windows e Linux)** que exibe um overlay flutuante sobre jogos e outros programas, capturando o texto da tela e traduzindo em tempo real com o provedor de IA da sua escolha. Também ofereceenda áudio (Live), entrevista, texto e arquivos de voz (WhatsApp).
 
-![Python](https://img.shields.io/badge/Python-3.8+-blue) ![License](https://img.shields.io/badge/License-MIT-green)
+![Python](https://img.shields.io/badge/Python-3.8+-blue) ![Windows](https://img.shields.io/badge/Windows-supported-blue) ![Linux](https://img.shields.io/badge/Linux-supported-orange) ![License](https://img.shields.io/badge/License-MIT-green)
 
 ---
 
@@ -48,27 +48,56 @@ Se quiser, você pode apoiar o projeto voluntariamente (via Pix, dentro do app),
 
 ---
 
-## Download (Windows)
+## Download
 
-**Não quer rodar os `.bat`?** Baixe o `Nidus.exe` na página de [Releases](https://github.com/Ettym200/nidus-pc/releases/latest), execute e pronto — não precisa instalar Python nem nada do repositório.
+**[Baixar última versão (Releases)](https://github.com/Ettym200/nidus-pc/releases/latest)**
 
-**[Baixar Nidus para Windows (última versão)](https://github.com/Ettym200/nidus-pc/releases/latest)**
+| Sistema | Arquivo | Observação |
+|---|---|---|
+| **Windows** | `Nidus-windows.exe` (ou `Nidus.exe`) | Rode como administrador para atalhos em jogos |
+| **Linux** | `Nidus-linux` | Live = áudio do **sistema** (PulseAudio/PipeWire). App específico ainda é só Windows |
 
-1. Baixe o arquivo `Nidus.exe`
+### Windows (executável)
+
+1. Baixe o `.exe` em [Releases](https://github.com/Ettym200/nidus-pc/releases/latest)
 2. Execute e conceda permissão de administrador quando o Windows pedir
 3. Configure sua API Key e comece a usar
 
-> Versão atual: [v1.0.8](https://github.com/Ettym200/nidus-pc/releases/tag/v1.0.8)
+### Linux (binário)
+
+```bash
+chmod +x Nidus-linux
+./Nidus-linux
+```
+
+Dependências de sistema recomendadas (Debian/Ubuntu):
+
+```bash
+sudo apt install gir1.2-gtk-3.0 gir1.2-webkit2-4.1 pipewire-pulse
+```
+
+> **Não use `sudo ./Nidus-linux`** para o Live — o áudio do usuário (Pulse/PipeWire) some quando roda como root.
+
+### Android / APK
+
+A versão mobile (Flutter) está em outro repositório:
+
+**[Repositório Android](https://github.com/Ettym200/Nidus)** · **[Baixar APK](https://github.com/Ettym200/Nidus/releases/latest)**
 
 ---
 
-## Download (Android / APK)
+## Windows vs Linux
 
-Quer usar o Nidus no celular? A versão para Android (Flutter) está em outro repositório:
-
-**[Repositório do Nidus para Android](https://github.com/Ettym200/Nidus)**
-
-**[Baixar APK (última versão)](https://github.com/Ettym200/Nidus/releases/latest)**
+| Recurso | Windows | Linux |
+|---|---|---|
+| Tradução por tela (Jogo) | Sim | Sim |
+| Overlay | Sim | Sim |
+| Traduzir texto / Uga Buga | Sim | Sim |
+| Transcrever áudio (mp3/ogg) | Sim | Sim |
+| Live — todo o sistema | Sim (WASAPI) | Sim (Pulse/PipeWire) |
+| Live — aplicativo específico | Sim | Ainda não |
+| Entrevista | Sim | Sim (áudio do sistema) |
+| Atalhos F9–F12 | Sim (`keyboard`, admin) | Sim (`pynput`) |
 
 ---
 
@@ -78,27 +107,36 @@ Quer usar o Nidus no celular? A versão para Android (Flutter) está em outro re
 
 **Windows (executável — recomendado)**
 
-Baixe o `Nidus.exe` em [Releases](https://github.com/Ettym200/nidus-pc/releases/latest) e execute. Só isso.
+Baixe o `.exe` em [Releases](https://github.com/Ettym200/nidus-pc/releases/latest) e execute.
 
-**Windows (código-fonte — usa os `.bat`)**
+**Windows (código-fonte)**
 
 1. Instale o [Python 3.8+](https://www.python.org/downloads/) — marque **"Add Python to PATH"**
 2. Clone ou baixe este repositório
-3. Execute `scripts\instalar.bat` — instala todas as dependências automaticamente
-4. Execute `scripts\iniciar.bat` para abrir o app
+3. Execute `scripts\instalar.bat`
+4. Execute `scripts\iniciar.bat`
 
-> O app pede permissão de administrador automaticamente — necessário para os atalhos funcionarem dentro do jogo.
+> O app pede administrador automaticamente — necessário para os atalhos funcionarem dentro do jogo.
 
-**Linux** (suporte experimental)
+**Linux (código-fonte)**
 
 ```bash
 git clone https://github.com/Ettym200/nidus-pc
 cd nidus-pc
-pip install -r requirements.txt
-bash scripts/iniciar.sh
+bash scripts/instalar_linux.sh   # deps de sistema + pip
+bash scripts/iniciar.sh          # abre o app
+# ou com logs:
+bash scripts/iniciar.sh --debug
 ```
 
-> No Wayland, captura de tela e atalhos globais podem ter limitações. Se não funcionar, tente com `sudo`.
+Só com pip (se as libs GTK/WebKit já existirem):
+
+```bash
+pip install -r requirements.txt
+python3 main.py
+```
+
+> No Wayland, captura de tela e atalhos globais podem ter limitações. Em caso de problema, teste em sessão X11.
 
 ### 2. Configure a API
 
@@ -111,90 +149,71 @@ Escolha um provedor e obtenha sua API Key:
 | OpenAI | Pago | [platform.openai.com](https://platform.openai.com) |
 | Anthropic | Pago | [console.anthropic.com](https://console.anthropic.com) |
 
-Cole a chave no campo **API Key** do app. Você pode salvar várias keys em **Gerenciar Keys**.
+Cole a chave no campo **API Key** do app (⚙).
 
 ### 3. Selecione a região
 
 - Abra o jogo e deixe o texto/legenda aparecer na tela
-- Clique em **Selecionar região** ou use o atalho configurado (padrão: `F9`)
-- Arraste para delimitar a área onde ficam as legendas
+- Clique em **Selecionar região** ou use o atalho (padrão: `F9`)
+- Arraste para delimitar a área das legendas
 
 ### 4. Traduza
 
-**Modo "Traduzir uma vez"** — pressione o atalho ou clique no botão. Ideal para itens, missões e textos pontuais.
+**Modo "Uma vez"** — atalho ou botão. Ideal para itens e missões.
 
-**Modo "Contínuo"** — monitora a região automaticamente e traduz quando o texto muda. Ideal para diálogos e cutscenes.
+**Modo "Contínuo"** — monitora a região e traduz quando o texto muda.
 
-A tradução aparece num overlay flutuante sobre o jogo. Você pode mover, redimensionar e ocultar quando quiser.
+A tradução aparece num overlay flutuante. Você pode mover, redimensionar e ocultar.
 
 ### 5. Tradução por áudio (Live)
 
-Na aba **Live**, o Nidus captura o áudio do sistema (ou de um aplicativo específico), transcreve com Whisper e traduz em tempo real — ideal para streams, vídeos e lives.
+Na aba **Live**, o Nidus captura áudio, transcreve com Whisper e traduz (ou só transcreve se idioma ouvido = idioma de destino).
 
-1. Configure a **API Key** na aba Jogo (mesma usada para tradução por tela)
-2. Na aba **Live**, escolha a fonte de áudio:
-   - **Todo o sistema** — captura tudo que estiver tocando
-   - **Aplicativo específico** — traduz só o navegador/jogo (ex.: Brave) e ignora Discord
-3. Selecione idioma da fala, modelo Whisper (`tiny`/`base` = mais rápido) e idioma de destino
-4. Pressione **F12** (ou o atalho configurado) para iniciar/parar
+1. Configure a **API Key** se for traduzir entre idiomas diferentes
+2. Escolha a fonte:
+   - **Todo o sistema** — Windows e Linux
+   - **Aplicativo específico** — só Windows
+3. Defina **Idioma ouvido** (ex.: Português) e destino
+4. **F12** para iniciar/parar
 
-O overlay mostra até 4 linhas de histórico, com fundo transparente e contorno nas letras para legibilidade em qualquer fundo.
-
-**Modo desenvolvedor:** execute `scripts\iniciar_debug.bat` para ver logs detalhados (`NIDUS_DEBUG=1`).
+No Linux, toque qualquer áudio no sistema (navegador, player) e use **Todo o sistema**.
 
 ### 6. Modo Entrevista
 
-Na aba **Entrevista**, o Nidus ouve o entrevistador e sugere o que você deve responder — ideal para entrevistas online.
+Ouve o entrevistador e sugere respostas com base no seu perfil. No Linux use captura do sistema; no Windows também pode filtrar por app.
 
-1. Preencha **Seu perfil** (cargo, stack, experiência)
-2. Configure **Ouvir de** (todo o sistema ou app da chamada)
-3. Escolha idioma das respostas e tipo de entrevista
-4. Clique **Iniciar modo entrevista**
+### 7. Transcrever áudio / Uga Buga / Texto
 
-A pergunta é montada enquanto o entrevistador fala e a resposta só é gerada após uma pausa breve.
-
-### 7. Modo Uga Buga
-
-Na aba **Uga Buga**, cole a descrição de uma skill, item ou talento (ou envie prints com **Ctrl+V** / **Abrir imagem**). A IA gera um resumo curto no estilo “uga buga” — ideal para entender mecânicas de RPG/MMO sem ler textão.
-
-1. Cole o texto da skill ou adicione uma ou mais imagens
-2. Clique **Gerar resumo uga buga**
-3. Copie o resultado com **Copiar**
+- **Transcrever áudio** — mp3/ogg do WhatsApp → texto (Whisper local)
+- **Uga Buga** — resume skill/item a partir de texto ou prints
+- **Traduzir texto** — cola e traduz
 
 ---
 
 ## Atalhos
 
-Os atalhos funcionam mesmo com o jogo em foco (rode como administrador). Você pode usar **teclas do teclado ou botões do mouse** (incluindo Mouse 4 e 5).
-
 | Padrão | Ação |
 |---|---|
-| `F9` | Abrir seletor de região |
+| `F9` | Selecionar região |
 | `F10` | Traduzir agora / Iniciar-Parar |
-| `F11` | Mostrar / ocultar tradução |
-| `F12` | Iniciar / parar tradução por áudio (Live) |
+| `F11` | Mostrar / ocultar overlay |
+| `F12` | Live on/off |
 
-Para trocar um atalho: clique no campo correspondente e pressione a tecla ou botão desejado.
+No Windows, rode como administrador para os atalhos funcionarem com o jogo em foco.
 
 ---
 
 ## Funcionalidades
 
-- Tradução em tempo real ou sob demanda (captura de tela + IA)
-- **Modo Entrevista** — ouve perguntas e sugere respostas com base no seu perfil
-- **Tradução por áudio (Live)** — captura áudio do sistema ou de um app, STT com Whisper, tradução via API
-- Filtro anti-alucinação do Whisper (evita repetições como "hum hum hum")
-- Captura por aplicativo (ex.: só o navegador, sem Discord)
-- Overlay configurável: transparente, semi-transparente, escuro, preto ou azul
-- Histórico de até 4 linhas no modo Live
-- Tradução em streaming (texto aparece aos poucos)
-- Overlay arrastável e redimensionável sobre qualquer jogo
-- Seleção visual da região da tela
-- Suporte a OpenRouter, Groq, OpenAI, Anthropic e APIs customizadas
-- Atalhos globais de teclado e mouse
-- Tradutor de texto manual (aba **Traduzir Texto**)
-- **Uga Buga** — resume skills/itens de jogo a partir de texto ou prints (estilo meme)
-- Detecção inteligente de mudança — só chama a IA quando o texto muda
+- Tradução por tela (região + IA) com overlay
+- **Live** — áudio do sistema (Win/Linux) ou app (Win)
+- **Entrevista** — perguntas → sugestões de resposta
+- Transcrição de arquivo (WhatsApp ogg/mp3)
+- Filtro anti-alucinação do Whisper
+- Overlay configurável
+- OpenRouter, Groq, OpenAI, Anthropic e APIs customizadas
+- Atalhos globais
+- Uga Buga + tradutor de texto
 
 ---
 
@@ -204,28 +223,42 @@ Para trocar um atalho: clique no campo correspondente e pressione a tecla ou bot
 nidus-pc/
 ├── main.py           # entrada do app
 ├── src/              # código Python
-├── assets/           # ícones e imagens
-├── scripts/          # instalar, iniciar e compilar
-└── docs/             # screenshots
+│   ├── audio_capture.py        # Windows (WASAPI)
+│   ├── audio_capture_linux.py  # Linux (Pulse/PipeWire)
+│   ├── hotkeys.py              # Win keyboard / Linux pynput
+│   └── ui/web/                 # interface
+├── assets/
+├── scripts/          # instalar / iniciar / compilar (Win + Linux)
+└── docs/
 ```
 
 ---
 
-## Compilar em .exe
+## Compilar
 
-Para gerar um executável standalone localmente:
+**Windows**
 
 ```
 scripts\compilar.bat
 ```
 
-O arquivo gerado fica em `dist\Nidus.exe`. Se não quiser compilar, baixe o `.exe` pronto em [Releases](https://github.com/Ettym200/nidus-pc/releases/latest).
+Gera `dist\Nidus.exe`.
+
+**Linux**
+
+```bash
+bash scripts/compilar_linux.sh
+```
+
+Gera `dist/Nidus-linux`.
+
+Releases oficiais (tag `v*`) publicam os dois binários automaticamente via GitHub Actions.
 
 ---
 
 ## Apoie o projeto
 
-Se o Nidus te ajudou, você pode contribuir voluntariamente via Pix dentro do app (**Apoiar via Pix**). Isso é totalmente opcional.
+Se o Nidus te ajudou, você pode contribuir voluntariamente via Pix dentro do app. Isso é totalmente opcional.
 
 ---
 

@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "C:\Users\jefer\Documents\GitHub\nidus-pc\main.py", line 2401, in <module>
+    app = App()
+          ^^^^^
+  File "C:\Users\jefer\Documents\GitHub\nidus-pc\main.py", line 231, in __init__
+    self._build_ui()
+  File "C:\Users\jefer\Documents\GitHub\nidus-pc\main.py", line 342, in _build_ui
+    self._build_ugabuga_tab(tab_ugabuga)
+  File "C:\Users\jefer\Documents\GitHub\nidus-pc\main.py", line 1226, in _build_ugabuga_tab
+    theme.hint_label(
+  File "C:\Users\jefer\Documents\GitHub\nidus-pc\src\ui_theme.py", line 58, in hint_label
+    return ctk.CTkLabel(
+           ^^^^^^^^^^^^^
+TypeError: customtkinter.windows.widgets.ctk_label.CTkLabel() got multiple values for keyword argument 'wraplength'

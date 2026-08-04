@@ -5,7 +5,7 @@ import threading
 
 import numpy as np
 
-from src.audio_capture import SAMPLE_RATE, READ_DURATION
+from src.audio_constants import READ_DURATION, SAMPLE_RATE
 from src.debug_log import log
 
 PROC_SAMPLE_RATE = 48000
