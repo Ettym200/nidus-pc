@@ -4,3 +4,7 @@ config.json
 dist/
 build/
 *.spec
+
+nidus_error.log
+build_log.txt
+
